@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'name' => env('HOTEL_NAME', env('APP_NAME', 'Grand Ceylon Hotel & Resort')),
+    'name' => env('HOTEL_NAME', env('APP_NAME', 'Odara Food Pvt Limited')),
     'vat_rate' => (float) env('HOTEL_VAT_RATE', 18.00),
     'service_charge_rate' => (float) env('HOTEL_SERVICE_CHARGE_RATE', 10.00),
     'max_cashier_discount_percentage' => (float) env('HOTEL_MAX_CASHIER_DISCOUNT', 10.00),

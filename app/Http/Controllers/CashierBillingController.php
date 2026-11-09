@@ -65,7 +65,7 @@ class CashierBillingController extends Controller
             'selectedOrder' => $selectedOrder,
             'viewer' => $viewer,
             'maxStandardDiscount' => (float) config('hotel.max_cashier_discount_percentage', 10.00),
-            'hotelName' => (string) config('hotel.name', 'Grand Ceylon Hotel & Resort'),
+            'hotelName' => (string) config('hotel.name', 'Odara Food Pvt Limited'),
         ]);
     }
 

@@ -18,7 +18,7 @@ class SmsReceiptService
      */
     public function sendReceipt(Order $order): array
     {
-        $hotelName = (string) config('hotel.name', 'Grand Ceylon Hotel & Resort');
+        $hotelName = (string) config('hotel.name', 'Odara Food Pvt Limited');
         $signedReceiptUrl = URL::signedRoute('order.receipt', ['order' => $order->id]);
 
         $message = sprintf(

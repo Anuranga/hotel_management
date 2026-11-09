@@ -31,7 +31,7 @@ class AuthController extends Controller
         return view('welcome', [
             'tables' => $tables,
             'staffUsers' => $staffUsers,
-            'hotelName' => (string) config('hotel.name', 'Grand Ceylon Hotel & Resort'),
+            'hotelName' => (string) config('hotel.name', 'Odara Food Pvt Limited'),
         ]);
     }
 
@@ -48,7 +48,7 @@ class AuthController extends Controller
 
         return view('auth.login', [
             'demoUsers' => $demoUsers,
-            'hotelName' => (string) config('hotel.name', 'Grand Ceylon Hotel & Resort'),
+            'hotelName' => (string) config('hotel.name', 'Odara Food Pvt Limited'),
         ]);
     }
 
