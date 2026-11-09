@@ -86,10 +86,11 @@
                         </div>
 
                         <!-- Scannable QR Code for Phone Camera / QR Scanner -->
-                        <div class="mx-auto my-3 flex h-36 w-36 items-center justify-center rounded-xl bg-white p-2 shadow-inner">
-                            <img src="https://api.qrserver.com/v1/create-qr-code/?size=140x140&data={{ urlencode($phoneScannableUrl) }}"
+                        <div class="mx-auto my-3 flex h-40 w-40 items-center justify-center rounded-xl bg-white p-2 shadow-inner">
+                            <img src="https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=12&ecc=M&data={{ urlencode($phoneScannableUrl) }}"
                                  alt="Scan QR for Table {{ $table->table_number }}"
-                                 class="h-32 w-32 object-contain">
+                                 crossorigin="anonymous"
+                                 class="h-36 w-36 object-contain">
                         </div>
 
                         <div class="text-center text-xs text-slate-400">
@@ -102,10 +103,18 @@
                         </div>
                     </div>
 
-                    <a href="{{ $browserSignedUrl }}"
-                       class="mt-3 block w-full rounded-xl bg-amber-500 py-2 text-center text-xs font-extrabold text-slate-950 transition hover:bg-amber-400">
-                        Open Menu (Table {{ $table->table_number }}) &rarr;
-                    </a>
+                    <div class="mt-3 space-y-2">
+                        <a href="{{ $browserSignedUrl }}"
+                           class="block w-full rounded-xl bg-amber-500 py-2 text-center text-xs font-extrabold text-slate-950 transition hover:bg-amber-400">
+                            Open Menu (Table {{ $table->table_number }}) &rarr;
+                        </a>
+
+                        <button type="button"
+                                @click="downloadQr(@js('https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=12&ecc=M&data=' . urlencode($phoneScannableUrl)), @js('Table-' . $table->table_number . '-QR.png'))"
+                                class="block w-full rounded-xl border border-slate-700 bg-slate-950 py-1.5 text-center text-[11px] font-bold text-slate-300 transition hover:border-amber-500">
+                            ⬇️ Download QR Image
+                        </button>
+                    </div>
                 </div>
             @empty
                 <div class="col-span-full rounded-2xl border border-slate-800 bg-slate-900 p-6 text-center text-sm text-slate-400">
@@ -119,16 +128,36 @@
     <div x-show="scannerOpen"
          x-cloak
          class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 p-4 backdrop-blur-sm">
-        <div @click.away="closeScanner()"
-             class="w-full max-w-md rounded-3xl border border-slate-800 bg-slate-900 p-6 shadow-2xl">
+        <div class="w-full max-w-md rounded-3xl border border-slate-800 bg-slate-900 p-6 shadow-2xl">
             <div class="flex items-center justify-between border-b border-slate-800 pb-3">
                 <h3 class="text-base font-extrabold text-white">📷 Scan Table QR Code</h3>
-                <button type="button" @click="closeScanner()" class="text-xs text-slate-400 hover:text-white">Close &times;</button>
+                <button type="button" @click="closeScanner()" class="rounded-lg bg-slate-800 px-2.5 py-1 text-xs font-bold text-slate-300 hover:text-white">
+                    Close &times;
+                </button>
             </div>
+
             <p class="mt-2 text-xs text-slate-400">
-                Point your camera at a table QR code or upload a QR code image to automatically open that table's digital menu.
+                Use your device camera or upload a saved Table QR image to open that table's digital menu.
             </p>
-            <div id="qr-reader" class="mt-4 overflow-hidden rounded-2xl border border-slate-800 bg-slate-950"></div>
+
+            <!-- Action Buttons: Live Camera vs Image Upload -->
+            <div class="mt-4 grid grid-cols-2 gap-2.5">
+                <button type="button"
+                        @click="startCamera()"
+                        class="rounded-xl bg-amber-500 px-3 py-2.5 text-xs font-extrabold text-slate-950 shadow transition hover:bg-amber-400">
+                    🎥 Start Camera
+                </button>
+
+                <label class="cursor-pointer rounded-xl border border-emerald-500/50 bg-emerald-500/15 px-3 py-2.5 text-center text-xs font-extrabold text-emerald-300 transition hover:bg-emerald-500 hover:text-slate-950">
+                    🖼️ Scan QR Image File
+                    <input type="file" accept="image/*" class="hidden" @change="scanImageFile($event)">
+                </label>
+            </div>
+
+            <div x-show="scanError" x-cloak class="mt-3 rounded-xl border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-xs text-rose-300" x-text="scanError"></div>
+            <div x-show="scanStatus" x-cloak class="mt-3 rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-xs font-bold text-emerald-300" x-text="scanStatus"></div>
+
+            <div id="qr-reader" class="mt-4 min-h-[240px] overflow-hidden rounded-2xl border border-slate-800 bg-slate-950"></div>
         </div>
     </div>
 </div>
@@ -139,25 +168,138 @@
 function qrScannerPortal() {
     return {
         scannerOpen: false,
-        scannerInstance: null,
+        html5QrCode: null,
+        cameraRunning: false,
+        scanError: '',
+        scanStatus: '',
 
         openScanner() {
             this.scannerOpen = true;
+            this.scanError = '';
+            this.scanStatus = '';
             this.$nextTick(() => {
-                if (typeof Html5QrcodeScanner === 'undefined') return;
-                this.scannerInstance = new Html5QrcodeScanner('qr-reader', { fps: 10, qrbox: { width: 220, height: 220 } }, false);
-                this.scannerInstance.render((decodedText) => {
-                    this.closeScanner();
-                    window.location.href = decodedText;
-                }, () => {});
+                this.startCamera();
             });
+        },
+
+        ensureInstance() {
+            if (!this.html5QrCode && typeof Html5Qrcode !== 'undefined') {
+                this.html5QrCode = new Html5Qrcode('qr-reader');
+            }
+            return this.html5QrCode;
+        },
+
+        startCamera() {
+            this.scanError = '';
+            this.scanStatus = 'Requesting camera access...';
+            const qr = this.ensureInstance();
+            if (!qr) {
+                this.scanError = 'QR Scanner library failed to load.';
+                this.scanStatus = '';
+                return;
+            }
+
+            if (this.cameraRunning) {
+                return;
+            }
+
+            qr.start(
+                { facingMode: 'environment' },
+                { fps: 10, qrbox: { width: 220, height: 220 } },
+                (decodedText) => {
+                    this.handleDecodedUrl(decodedText);
+                },
+                () => {}
+            ).then(() => {
+                this.cameraRunning = true;
+                this.scanStatus = 'Camera active — point at any Table QR code.';
+            }).catch((err) => {
+                this.cameraRunning = false;
+                this.scanStatus = '';
+                this.scanError = 'Camera unavailable or permission denied. You can click "Scan QR Image File" above to upload a QR image instead.';
+            });
+        },
+
+        async scanImageFile(event) {
+            const file = event.target.files && event.target.files[0];
+            if (!file) return;
+
+            this.scanError = '';
+            this.scanStatus = 'Decoding QR image...';
+
+            try {
+                if (this.html5QrCode && this.cameraRunning) {
+                    await this.html5QrCode.stop();
+                    this.cameraRunning = false;
+                }
+
+                // 1. Try native hardware-accelerated BarcodeDetector first (Chrome/Edge/Android)
+                if ('BarcodeDetector' in window) {
+                    try {
+                        const detector = new BarcodeDetector({ formats: ['qr_code'] });
+                        const bitmap = await createImageBitmap(file);
+                        const barcodes = await detector.detect(bitmap);
+                        if (barcodes && barcodes.length > 0 && barcodes[0].rawValue) {
+                            this.handleDecodedUrl(barcodes[0].rawValue);
+                            return;
+                        }
+                    } catch (nativeErr) {}
+                }
+
+                // 2. Fallback to Html5Qrcode file scanner
+                const qr = this.ensureInstance();
+                if (!qr) throw new Error('Scanner unavailable');
+                const decodedText = await qr.scanFile(file, true);
+                this.handleDecodedUrl(decodedText);
+            } catch (err) {
+                this.scanStatus = '';
+                this.scanError = 'Could not detect a valid QR code in that image. Please use the "Download QR Image" button on a table card and select that file.';
+            } finally {
+                event.target.value = '';
+            }
+        },
+
+        async downloadQr(qrImageUrl, filename) {
+            try {
+                const res = await fetch(qrImageUrl);
+                const blob = await res.blob();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                URL.revokeObjectURL(url);
+            } catch (e) {
+                window.open(qrImageUrl, '_blank');
+            }
+        },
+
+        handleDecodedUrl(decodedText) {
+            this.scanStatus = 'QR Code verified! Redirecting to table menu...';
+            this.closeScanner();
+
+            try {
+                const parsed = new URL(decodedText, window.location.origin);
+                if (parsed.pathname.startsWith('/table/')) {
+                    window.location.href = parsed.pathname + parsed.search;
+                    return;
+                }
+            } catch (e) {}
+
+            window.location.href = decodedText;
         },
 
         closeScanner() {
             this.scannerOpen = false;
-            if (this.scannerInstance) {
-                this.scannerInstance.clear().catch(() => {});
-                this.scannerInstance = null;
+            if (this.html5QrCode && this.cameraRunning) {
+                this.html5QrCode.stop().then(() => {
+                    this.cameraRunning = false;
+                    this.html5QrCode.clear();
+                }).catch(() => {
+                    this.cameraRunning = false;
+                });
             }
         }
     };

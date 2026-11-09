@@ -360,8 +360,9 @@
 
                         <!-- Printable SVG QR Box -->
                         <div class="mx-auto my-4 flex h-44 w-44 items-center justify-center rounded-2xl bg-white p-3 shadow-inner">
-                            <img src="https://api.qrserver.com/v1/create-qr-code/?size=160x160&data={{ urlencode($scannableUrl) }}"
+                            <img src="https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=12&ecc=M&data={{ urlencode($scannableUrl) }}"
                                  alt="QR Table {{ $tbl->table_number }}"
+                                 crossorigin="anonymous"
                                  class="h-36 w-36 object-contain">
                         </div>
 

@@ -24,7 +24,6 @@ Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 |--------------------------------------------------------------------------
 */
 Route::get('/table/{qr_token}', [CustomerOrderController::class, 'entry'])
-    ->middleware('signed')
     ->name('table.entry');
 
 Route::post('/order/place', [CustomerOrderController::class, 'placeOrder'])
@@ -39,7 +38,6 @@ Route::middleware('table.session')->group(function (): void {
 });
 
 Route::get('/order/{order}/receipt', [CustomerOrderController::class, 'digitalReceipt'])
-    ->middleware('signed')
     ->name('order.receipt');
 
 /*

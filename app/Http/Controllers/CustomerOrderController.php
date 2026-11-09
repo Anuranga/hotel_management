@@ -29,6 +29,10 @@ class CustomerOrderController extends Controller
      */
     public function entry(Request $request, string $qr_token): View|RedirectResponse
     {
+        if (! $this->hasValidProxyAwareSignature($request)) {
+            abort(403, 'Invalid or tampered QR code signature.');
+        }
+
         $table = RestaurantTable::query()
             ->where('qr_token', $qr_token)
             ->with('activeOrder')
@@ -219,6 +223,10 @@ class CustomerOrderController extends Controller
      */
     public function digitalReceipt(Request $request, Order $order): View
     {
+        if (! $this->hasValidProxyAwareSignature($request)) {
+            abort(403, 'Invalid or expired receipt signature.');
+        }
+
         $order->load([
             'restaurantTable',
             'batches.items.menuItem.category',
@@ -231,6 +239,53 @@ class CustomerOrderController extends Controller
             'livePayload' => $this->formatLiveOrderPayload($order),
             'isReceiptView' => true,
         ]);
+    }
+
+    /**
+     * Verify Laravel signed URL signatures across reverse proxies (HTTP/HTTPS) and LAN/localhost origins.
+     */
+    private function hasValidProxyAwareSignature(Request $request): bool
+    {
+        if ($request->hasValidSignature() || $request->hasValidSignature(false)) {
+            return true;
+        }
+
+        $signature = (string) $request->query('signature', '');
+        if ($signature === '') {
+            return false;
+        }
+
+        $appKey = (string) config('app.key', '');
+        if (str_starts_with($appKey, 'base64:')) {
+            $appKey = (string) base64_decode(substr($appKey, 7), true);
+        }
+
+        $path = '/'.ltrim($request->getPathInfo(), '/');
+        $queryWithoutSig = collect($request->query())
+            ->except('signature')
+            ->all();
+
+        $queryString = http_build_query($queryWithoutSig);
+        $relativeUri = $queryString !== '' ? "{$path}?{$queryString}" : $path;
+
+        $host = $request->getHttpHost();
+        $candidateRoots = array_unique(array_filter([
+            "https://{$host}",
+            "http://{$host}",
+            rtrim((string) config('app.url'), '/'),
+            rtrim((string) config('hotel.lan_url'), '/'),
+            'http://127.0.0.1:8000',
+            'http://localhost:8000',
+        ]));
+
+        foreach ($candidateRoots as $root) {
+            $expected = hash_hmac('sha256', $root.$relativeUri, $appKey);
+            if (hash_equals($expected, $signature)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
