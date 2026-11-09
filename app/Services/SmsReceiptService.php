@@ -38,7 +38,7 @@ class SmsReceiptService
             'grand_total' => number_format((float) $order->grand_total, 2, '.', ''),
             'receipt_url' => $signedReceiptUrl,
             'message' => $message,
-            'sender_id' => (string) config('hotel.sms.sender_id', 'GRANDCEYLON'),
+            'sender_id' => (string) config('hotel.sms.sender_id', 'ODARAFOOD'),
         ];
 
         $rateLimitKey = 'sms-receipt:'.$order->customer_phone;

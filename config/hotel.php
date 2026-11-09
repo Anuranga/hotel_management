@@ -13,7 +13,7 @@ return [
         'enabled' => (bool) env('HOTEL_SMS_ENABLED', true),
         'endpoint' => env('HOTEL_SMS_ENDPOINT', 'https://api.sms-gateway.local/v1/send'),
         'api_key' => env('HOTEL_SMS_API_KEY', 'local-dev-sms-key'),
-        'sender_id' => env('HOTEL_SMS_SENDER_ID', 'GRANDCEYLON'),
+        'sender_id' => env('HOTEL_SMS_SENDER_ID', 'ODARAFOOD'),
         'rate_limit_per_minute' => (int) env('HOTEL_SMS_RATE_LIMIT', 5),
     ],
 ];

@@ -152,7 +152,7 @@ class DatabaseSeeder extends Seeder
                         'is_vat_exempt' => false,
                     ],
                     [
-                        'name' => 'Grand Ceylon Lamprais',
+                        'name' => 'Odara Signature Lamprais',
                         'description' => 'Dutch-Burgher banana-leaf baked samba rice with mixed meat curry, seeni sambol, frikkadels, and ash plantain.',
                         'price' => 2950.00,
                         'cost_price' => 1100.00,
