@@ -119,6 +119,11 @@
                 <span>LKR <span x-text="order.vat_amount"></span></span>
             </div>
 
+            <div class="flex justify-between text-amber-300" x-show="Number(order.extra_charge_amount) > 0">
+                <span x-text="order.extra_charge_label || 'Extra Charges'"></span>
+                <span>+ LKR <span x-text="order.extra_charge_amount"></span></span>
+            </div>
+
             <div class="flex justify-between border-t border-slate-800 pt-3 text-base font-extrabold text-amber-400">
                 <span>Grand Total</span>
                 <span>LKR <span x-text="order.grand_total"></span></span>

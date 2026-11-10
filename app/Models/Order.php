@@ -34,8 +34,11 @@ class Order extends Model
         'vat_amount',
         'service_charge_rate',
         'service_charge_amount',
+        'extra_charge_label',
+        'extra_charge_amount',
         'grand_total',
         'payment_method',
+        'bill_requested_at',
         'settled_at',
     ];
 
@@ -51,6 +54,7 @@ class Order extends Model
         'vat_amount' => 0.00,
         'service_charge_rate' => 0.00,
         'service_charge_amount' => 0.00,
+        'extra_charge_amount' => 0.00,
         'grand_total' => 0.00,
         'payment_method' => 'unpaid',
     ];
@@ -68,7 +72,9 @@ class Order extends Model
             'vat_amount' => 'decimal:2',
             'service_charge_rate' => 'decimal:2',
             'service_charge_amount' => 'decimal:2',
+            'extra_charge_amount' => 'decimal:2',
             'grand_total' => 'decimal:2',
+            'bill_requested_at' => 'datetime',
             'settled_at' => 'datetime',
         ];
     }

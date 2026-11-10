@@ -3,17 +3,20 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\AppendOrderItemsRequest;
+use App\Http\Requests\PlaceOrderRequest;
 use App\Models\Category;
 use App\Models\InventoryLog;
 use App\Models\Order;
 use App\Models\OrderBatch;
 use App\Models\OrderItem;
+use App\Models\RestaurantTable;
 use App\Services\OrderBillingService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class StaffOrderController extends Controller
 {
@@ -37,10 +40,64 @@ class StaffOrderController extends Controller
             }])
             ->get();
 
+        $tables = RestaurantTable::query()
+            ->with('activeOrder')
+            ->orderBy('table_number')
+            ->get();
+
         return view('staff.orders', [
             'initialPayload' => $this->buildDashboardPayload($request),
             'categories' => $categories,
+            'tables' => $tables,
         ]);
+    }
+
+    /**
+     * Allow a Sales Assistant to create a new table order directly for customers without a QR smartphone.
+     */
+    public function createWalkInOrder(PlaceOrderRequest $request): JsonResponse|RedirectResponse
+    {
+        $validated = $request->validated();
+
+        /** @var Order $order */
+        $order = DB::transaction(function () use ($validated): Order {
+            $table = RestaurantTable::query()
+                ->whereKey($validated['restaurant_table_id'])
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $order = Order::create([
+                'restaurant_table_id' => $table->id,
+                'session_token' => (string) Str::uuid(),
+                'customer_name' => $validated['customer_name'],
+                'customer_phone' => $validated['customer_phone'],
+                'order_status' => 'confirmed',
+                'vat_rate' => (float) config('hotel.vat_rate', 18.00),
+                'service_charge_rate' => (float) config('hotel.service_charge_rate', 10.00),
+                'payment_method' => 'unpaid',
+            ]);
+
+            $batch = OrderBatch::create([
+                'order_id' => $order->id,
+                'batch_number' => 1,
+                'status' => 'confirmed',
+            ]);
+
+            $this->billingService->attachItemsToBatchWithLock($order, $batch, $validated['items']);
+
+            $table->update(['status' => 'occupied']);
+
+            return $this->billingService->recalculateOrder($order);
+        });
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'message' => "Walk-in Order #{$order->id} created and routed to Kitchen & Bar.",
+                'payload' => $this->buildDashboardPayload($request),
+            ], 201);
+        }
+
+        return redirect()->back()->with('status', "Assisted Order #{$order->id} created for Table {$order->restaurantTable?->table_number} and sent to Kitchen/Bar.");
     }
 
     /**
@@ -117,6 +174,43 @@ class StaffOrderController extends Controller
     }
 
     /**
+     * Final Sales Assistant Confirmation: Confirm all order items are completed and send the bill to Cashier.
+     */
+    public function completeAndSendToCashier(Request $request, Order $order): JsonResponse|RedirectResponse
+    {
+        DB::transaction(function () use ($order): void {
+            $lockedOrder = Order::query()
+                ->whereKey($order->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $lockedOrder->batches()
+                ->where('status', '!=', 'delivered')
+                ->update(['status' => 'delivered']);
+
+            $lockedOrder->items()
+                ->where('item_status', '!=', 'cancelled')
+                ->update(['item_status' => 'served']);
+
+            $lockedOrder->update([
+                'order_status' => 'served',
+                'bill_requested_at' => now(),
+            ]);
+
+            $this->billingService->recalculateOrder($lockedOrder);
+        });
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'message' => "Order #{$order->id} confirmed complete and sent to Cashier for billing!",
+                'payload' => $this->buildDashboardPayload($request),
+            ]);
+        }
+
+        return redirect()->back()->with('status', "Order #{$order->id} marked completed and dispatched to Cashier Billing!");
+    }
+
+    /**
      * Allow staff to verbally take and append add-on items directly to an active table's order.
      */
     public function appendStaffItems(AppendOrderItemsRequest $request, Order $order): JsonResponse|RedirectResponse
@@ -141,6 +235,7 @@ class StaffOrderController extends Controller
 
             if ($lockedOrder->order_status === 'served') {
                 $lockedOrder->order_status = 'confirmed';
+                $lockedOrder->bill_requested_at = null;
                 $lockedOrder->save();
             }
 
@@ -243,6 +338,8 @@ class StaffOrderController extends Controller
                 'customer_phone' => $order->displayPhoneFor($viewer),
                 'order_status' => $order->order_status,
                 'needs_confirmation' => $order->order_status === 'pending_confirmation' || $hasPendingBatch,
+                'is_sent_to_cashier' => $order->bill_requested_at !== null || $order->order_status === 'served',
+                'bill_requested_human' => $order->bill_requested_at?->format('h:i A'),
                 'gross_subtotal' => number_format((float) $order->gross_subtotal, 2, '.', ''),
                 'grand_total' => number_format((float) $order->grand_total, 2, '.', ''),
                 'created_at_human' => $order->created_at?->diffForHumans(),

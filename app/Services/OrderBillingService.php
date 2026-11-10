@@ -36,6 +36,7 @@ class OrderBillingService
      *     vat_amount: float,
      *     service_charge_rate: float,
      *     service_charge_amount: float,
+     *     extra_charge_amount: float,
      *     grand_total: float
      * }
      */
@@ -44,11 +45,13 @@ class OrderBillingService
         float $discountPercentage = 0.0,
         ?float $vatRate = null,
         ?float $serviceChargeRate = null,
-        bool $forceVatExempt = false
+        bool $forceVatExempt = false,
+        float $extraChargeAmount = 0.0
     ): array {
-        $vatRate ??= (float) config('hotel.vat_rate', 18.00);
-        $serviceChargeRate ??= (float) config('hotel.service_charge_rate', 10.00);
+        $vatRate = $vatRate !== null ? max(0.0, round($vatRate, 2)) : (float) config('hotel.vat_rate', 18.00);
+        $serviceChargeRate = $serviceChargeRate !== null ? max(0.0, round($serviceChargeRate, 2)) : (float) config('hotel.service_charge_rate', 10.00);
         $discountPercentage = max(0.0, min(100.0, round($discountPercentage, 2)));
+        $extraChargeAmount = max(0.0, round($extraChargeAmount, 2));
 
         $billableItems = $items->filter(
             fn (OrderItem $item): bool => $item->item_status !== 'cancelled'
@@ -71,7 +74,7 @@ class OrderBillingService
         $discountAmount = round($grossSubtotal * ($discountPercentage / 100), 2);
         $netTaxable = max(0.0, round($grossSubtotal - $discountAmount, 2));
 
-        if ($forceVatExempt || $grossSubtotal <= 0.0 || $taxableGross <= 0.0) {
+        if ($forceVatExempt || $vatRate <= 0.0 || $grossSubtotal <= 0.0 || $taxableGross <= 0.0) {
             $vatAmount = 0.00;
         } elseif (abs($taxableGross - $grossSubtotal) < 0.005) {
             $vatAmount = round($netTaxable * ($vatRate / 100), 2);
@@ -82,7 +85,7 @@ class OrderBillingService
         }
 
         $serviceChargeAmount = round($netTaxable * ($serviceChargeRate / 100), 2);
-        $grandTotal = round($netTaxable + $vatAmount + $serviceChargeAmount, 2);
+        $grandTotal = round($netTaxable + $vatAmount + $serviceChargeAmount + $extraChargeAmount, 2);
 
         return [
             'gross_subtotal' => $grossSubtotal,
@@ -93,6 +96,7 @@ class OrderBillingService
             'vat_amount' => $vatAmount,
             'service_charge_rate' => $serviceChargeRate,
             'service_charge_amount' => $serviceChargeAmount,
+            'extra_charge_amount' => $extraChargeAmount,
             'grand_total' => $grandTotal,
         ];
     }
@@ -100,17 +104,32 @@ class OrderBillingService
     /**
      * Recalculate and persist financial totals on an Order instance.
      */
-    public function recalculateOrder(Order $order, ?float $discountPercentage = null): Order
-    {
+    public function recalculateOrder(
+        Order $order,
+        ?float $discountPercentage = null,
+        ?float $vatRate = null,
+        ?float $serviceChargeRate = null,
+        ?float $extraChargeAmount = null,
+        ?string $extraChargeLabel = null
+    ): Order {
         $order->loadMissing('batches.items.menuItem');
 
         $allItems = $order->batches->flatMap(fn (OrderBatch $batch) => $batch->items);
         $discountPct = $discountPercentage ?? (float) $order->discount_percentage;
 
-        $vatRate = (float) ($order->vat_rate > 0 ? $order->vat_rate : config('hotel.vat_rate', 18.00));
-        $serviceRate = (float) ($order->service_charge_rate > 0 ? $order->service_charge_rate : config('hotel.service_charge_rate', 10.00));
+        $resolvedVatRate = $vatRate ?? (float) $order->vat_rate;
+        $resolvedServiceRate = $serviceChargeRate ?? (float) $order->service_charge_rate;
+        $resolvedExtraAmount = $extraChargeAmount ?? (float) ($order->extra_charge_amount ?? 0.0);
+        $resolvedExtraLabel = $extraChargeLabel !== null ? trim(strip_tags($extraChargeLabel)) : $order->extra_charge_label;
 
-        $totals = $this->calculateTotals($allItems, $discountPct, $vatRate, $serviceRate);
+        $totals = $this->calculateTotals(
+            $allItems,
+            $discountPct,
+            $resolvedVatRate,
+            $resolvedServiceRate,
+            false,
+            $resolvedExtraAmount
+        );
 
         $order->fill([
             'gross_subtotal' => $totals['gross_subtotal'],
@@ -120,6 +139,8 @@ class OrderBillingService
             'vat_amount' => $totals['vat_amount'],
             'service_charge_rate' => $totals['service_charge_rate'],
             'service_charge_amount' => $totals['service_charge_amount'],
+            'extra_charge_label' => $resolvedExtraAmount > 0 ? ($resolvedExtraLabel ?: 'Extra Service Charge') : null,
+            'extra_charge_amount' => $totals['extra_charge_amount'],
             'grand_total' => $totals['grand_total'],
         ]);
 

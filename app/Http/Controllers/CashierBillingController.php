@@ -2,9 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\AppendOrderItemsRequest;
 use App\Http\Requests\ApplyDiscountRequest;
 use App\Http\Requests\SettleOrderRequest;
+use App\Models\Category;
 use App\Models\Order;
+use App\Models\OrderBatch;
 use App\Models\RestaurantTable;
 use App\Services\OrderBillingService;
 use App\Services\SmsReceiptService;
@@ -36,6 +39,7 @@ class CashierBillingController extends Controller
                 'batches.items.menuItem.category',
                 'discountApprover',
             ])
+            ->orderByRaw("CASE WHEN bill_requested_at IS NOT NULL OR order_status = 'served' THEN 0 ELSE 1 END")
             ->orderByDesc('updated_at')
             ->get();
 
@@ -59,10 +63,18 @@ class CashierBillingController extends Controller
                 ?? Order::with(['restaurantTable', 'batches.items.menuItem.category', 'discountApprover'])->find($selectedOrderId);
         }
 
+        $categories = Category::query()
+            ->active()
+            ->with(['menuItems' => function ($query): void {
+                $query->where('is_available', true)->orderBy('name');
+            }])
+            ->get();
+
         return view('cashier.terminal', [
             'activeOrders' => $activeOrders,
             'recentSettledOrders' => $recentSettledOrders,
             'selectedOrder' => $selectedOrder,
+            'categories' => $categories,
             'viewer' => $viewer,
             'maxStandardDiscount' => (float) config('hotel.max_cashier_discount_percentage', 10.00),
             'hotelName' => (string) config('hotel.name', 'Odara Food Pvt Limited'),
@@ -70,7 +82,7 @@ class CashierBillingController extends Controller
     }
 
     /**
-     * Apply a discount percentage to an active order.
+     * Apply discount, service charge rate, tax/VAT rate, and extra charges to an active order.
      * Discounts > 10% require Manager/Admin PIN verification and trigger an audit_logs entry.
      */
     public function applyDiscount(ApplyDiscountRequest $request, Order $order): JsonResponse|RedirectResponse
@@ -87,7 +99,7 @@ class CashierBillingController extends Controller
 
             if (! $lockedOrder->isActive()) {
                 throw ValidationException::withMessages([
-                    'order' => ['Cannot modify discount on a settled or cancelled order.'],
+                    'order' => ['Cannot modify charges or discounts on a settled or cancelled order.'],
                 ]);
             }
 
@@ -107,8 +119,31 @@ class CashierBillingController extends Controller
                 $approverId = $authorizer->id;
             }
 
+            $vatRate = array_key_exists('vat_rate', $validated) && $validated['vat_rate'] !== null
+                ? round((float) $validated['vat_rate'], 2)
+                : (float) $lockedOrder->vat_rate;
+
+            $serviceChargeRate = array_key_exists('service_charge_rate', $validated) && $validated['service_charge_rate'] !== null
+                ? round((float) $validated['service_charge_rate'], 2)
+                : (float) $lockedOrder->service_charge_rate;
+
+            $extraChargeAmount = array_key_exists('extra_charge_amount', $validated) && $validated['extra_charge_amount'] !== null
+                ? round((float) $validated['extra_charge_amount'], 2)
+                : (float) ($lockedOrder->extra_charge_amount ?? 0.0);
+
+            $extraChargeLabel = array_key_exists('extra_charge_label', $validated)
+                ? (string) $validated['extra_charge_label']
+                : $lockedOrder->extra_charge_label;
+
             $lockedOrder->discount_approved_by = $approverId;
-            $recalculated = $this->billingService->recalculateOrder($lockedOrder, $discountPercentage);
+            $recalculated = $this->billingService->recalculateOrder(
+                $lockedOrder,
+                $discountPercentage,
+                $vatRate,
+                $serviceChargeRate,
+                $extraChargeAmount,
+                $extraChargeLabel
+            );
 
             if ($discountPercentage > $maxStandard) {
                 $this->billingService->recordAudit(
@@ -133,14 +168,61 @@ class CashierBillingController extends Controller
 
         if ($request->expectsJson()) {
             return response()->json([
-                'message' => "Discount of {$updatedOrder->discount_percentage}% applied.",
+                'message' => "Bill charges, taxes, and discount ({$updatedOrder->discount_percentage}%) updated.",
                 'order' => $updatedOrder->fresh(['restaurantTable', 'discountApprover']),
             ]);
         }
 
         return redirect()
             ->route('cashier.billing', ['order_id' => $updatedOrder->id])
-            ->with('status', "Discount ({$updatedOrder->discount_percentage}%) applied to Order #{$updatedOrder->id}.");
+            ->with('status', "Bill charges, taxes, and discount updated for Order #{$updatedOrder->id}.");
+    }
+
+    /**
+     * Allow Cashier to append additional menu items directly at the billing counter before settlement.
+     */
+    public function appendCashierItems(AppendOrderItemsRequest $request, Order $order): JsonResponse|RedirectResponse
+    {
+        $validated = $request->validated();
+
+        DB::transaction(function () use ($order, $validated): void {
+            $lockedOrder = Order::query()
+                ->whereKey($order->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if (! $lockedOrder->isActive()) {
+                throw ValidationException::withMessages([
+                    'order' => ['Cannot append items to a settled or cancelled order.'],
+                ]);
+            }
+
+            $nextBatchNumber = ((int) $lockedOrder->batches()->max('batch_number')) + 1;
+
+            $batch = OrderBatch::create([
+                'order_id' => $lockedOrder->id,
+                'batch_number' => $nextBatchNumber,
+                'status' => 'delivered',
+            ]);
+
+            $createdItems = $this->billingService->attachItemsToBatchWithLock($lockedOrder, $batch, $validated['items']);
+
+            foreach ($createdItems as $item) {
+                $item->update(['item_status' => 'served']);
+            }
+
+            $this->billingService->recalculateOrder($lockedOrder);
+        });
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'message' => "Items added to Order #{$order->id} bill.",
+            ]);
+        }
+
+        return redirect()
+            ->route('cashier.billing', ['order_id' => $order->id])
+            ->with('status', "Additional items appended to Order #{$order->id} invoice.");
     }
 
     /**
@@ -176,6 +258,22 @@ class CashierBillingController extends Controller
                 ? round((float) $validated['discount_percentage'], 2)
                 : (float) $lockedOrder->discount_percentage;
 
+            $vatRate = array_key_exists('vat_rate', $validated) && $validated['vat_rate'] !== null
+                ? round((float) $validated['vat_rate'], 2)
+                : (float) $lockedOrder->vat_rate;
+
+            $serviceChargeRate = array_key_exists('service_charge_rate', $validated) && $validated['service_charge_rate'] !== null
+                ? round((float) $validated['service_charge_rate'], 2)
+                : (float) $lockedOrder->service_charge_rate;
+
+            $extraChargeAmount = array_key_exists('extra_charge_amount', $validated) && $validated['extra_charge_amount'] !== null
+                ? round((float) $validated['extra_charge_amount'], 2)
+                : (float) ($lockedOrder->extra_charge_amount ?? 0.0);
+
+            $extraChargeLabel = array_key_exists('extra_charge_label', $validated)
+                ? (string) $validated['extra_charge_label']
+                : $lockedOrder->extra_charge_label;
+
             $oldDiscountPct = (float) $lockedOrder->discount_percentage;
             $oldDiscountAmt = (float) $lockedOrder->discount_amount;
 
@@ -201,7 +299,14 @@ class CashierBillingController extends Controller
                 $lockedOrder->discount_approved_by = null;
             }
 
-            $recalculated = $this->billingService->recalculateOrder($lockedOrder, $discountPercentage);
+            $recalculated = $this->billingService->recalculateOrder(
+                $lockedOrder,
+                $discountPercentage,
+                $vatRate,
+                $serviceChargeRate,
+                $extraChargeAmount,
+                $extraChargeLabel
+            );
 
             if ($discountPercentage > $maxStandard && abs($discountPercentage - $oldDiscountPct) > 0.005) {
                 $this->billingService->recordAudit(

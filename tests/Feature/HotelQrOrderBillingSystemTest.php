@@ -287,4 +287,93 @@ class HotelQrOrderBillingSystemTest extends TestCase
                 ->exists()
         );
     }
+
+    public function test_sales_assistant_walk_in_order_creation_send_to_cashier_and_extra_charges_billing(): void
+    {
+        $table = RestaurantTable::where('status', 'vacant')->firstOrFail();
+        $menuItem = MenuItem::where('is_vat_exempt', false)->where('current_stock', '>', 5)->firstOrFail();
+        $staffUser = User::whereHas('role', fn ($q) => $q->where('name', Role::STAFF))->firstOrFail();
+        $cashier = User::whereHas('role', fn ($q) => $q->where('name', Role::CASHIER))->firstOrFail();
+
+        // 1. Sales Assistant creates an assisted walk-in order for a customer without a smartphone QR scanner
+        $this->actingAs($staffUser)
+            ->post(route('staff.orders.create'), [
+                'restaurant_table_id' => $table->id,
+                'customer_name' => 'Walk-in Guest Perera',
+                'customer_phone' => '0770000000',
+                'items' => [
+                    [
+                        'menu_item_id' => $menuItem->id,
+                        'quantity' => 2,
+                        'notes' => 'Verbal order via Sales Assistant',
+                    ],
+                ],
+            ])
+            ->assertRedirect();
+
+        $order = Order::where('customer_name', 'Walk-in Guest Perera')->firstOrFail();
+        $this->assertSame('confirmed', $order->order_status);
+        $this->assertSame('occupied', $table->fresh()?->status);
+
+        // 2. Sales Assistant appends verbal add-on items when customer asks
+        $this->actingAs($staffUser)
+            ->post(route('staff.orders.append', ['order' => $order->id]), [
+                'items' => [
+                    [
+                        'menu_item_id' => $menuItem->id,
+                        'quantity' => 1,
+                        'notes' => 'Extra portion requested verbally',
+                    ],
+                ],
+            ])
+            ->assertRedirect();
+
+        $this->assertSame(2, $order->batches()->count());
+
+        // 3. Sales Assistant confirms all order items are completed and sends bill to Cashier
+        $this->actingAs($staffUser)
+            ->postJson(route('staff.orders.send-to-cashier', ['order' => $order->id]))
+            ->assertOk();
+
+        $order->refresh();
+        $this->assertSame('served', $order->order_status);
+        $this->assertNotNull($order->bill_requested_at);
+
+        // 4. Cashier configures Service Charge %, Tax/VAT %, and Extra Charges (e.g. Corkage / Packaging)
+        $grossSubtotal = round((float) $menuItem->price * 3, 2);
+        $this->actingAs($cashier)
+            ->postJson(route('cashier.orders.discount', ['order' => $order->id]), [
+                'discount_percentage' => 0,
+                'service_charge_rate' => 12,
+                'vat_rate' => 15,
+                'extra_charge_label' => 'Corkage & Packaging Fee',
+                'extra_charge_amount' => 500.00,
+            ])
+            ->assertOk();
+
+        $order->refresh();
+        $expectedServiceCharge = round($grossSubtotal * 0.12, 2);
+        $expectedVat = round($grossSubtotal * 0.15, 2);
+        $expectedGrandTotal = round($grossSubtotal + $expectedServiceCharge + $expectedVat + 500.00, 2);
+
+        $this->assertEquals(12.00, (float) $order->service_charge_rate);
+        $this->assertEquals(15.00, (float) $order->vat_rate);
+        $this->assertSame('Corkage & Packaging Fee', $order->extra_charge_label);
+        $this->assertEquals(500.00, (float) $order->extra_charge_amount);
+        $this->assertEquals($expectedGrandTotal, (float) $order->grand_total);
+
+        // 5. Cashier settles bill
+        $this->actingAs($cashier)
+            ->postJson(route('cashier.orders.settle', ['order' => $order->id]), [
+                'payment_method' => 'cash',
+                'service_charge_rate' => 12,
+                'vat_rate' => 15,
+                'extra_charge_label' => 'Corkage & Packaging Fee',
+                'extra_charge_amount' => 500.00,
+            ])
+            ->assertOk();
+
+        $this->assertSame('settled', $order->fresh()?->order_status);
+        $this->assertSame('vacant', $table->fresh()?->status);
+    }
 }

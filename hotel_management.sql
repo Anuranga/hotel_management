@@ -38,7 +38,7 @@ CREATE TABLE `audit_logs` (
   KEY `audit_logs_auditable_type_auditable_id_index` (`auditable_type`,`auditable_id`),
   KEY `audit_logs_event_type_index` (`event_type`),
   CONSTRAINT `audit_logs_user_id_foreign` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -47,6 +47,7 @@ CREATE TABLE `audit_logs` (
 
 LOCK TABLES `audit_logs` WRITE;
 /*!40000 ALTER TABLE `audit_logs` DISABLE KEYS */;
+INSERT INTO `audit_logs` VALUES (1,2,'discount_override','App\\Models\\Order',1,'{\"discount_percentage\":0,\"discount_amount\":0}','{\"discount_percentage\":100,\"discount_amount\":10640,\"approved_by_user_id\":2}','127.0.0.1','2026-11-09 11:58:01','2026-11-09 11:58:01');
 /*!40000 ALTER TABLE `audit_logs` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -72,6 +73,7 @@ CREATE TABLE `cache` (
 
 LOCK TABLES `cache` WRITE;
 /*!40000 ALTER TABLE `cache` DISABLE KEYS */;
+INSERT INTO `cache` VALUES ('odara-food-pvt-limited-cache-sms-receipt:0702132852','i:1;',1794245342),('odara-food-pvt-limited-cache-sms-receipt:0702132852:timer','i:1794245342;',1794245342);
 /*!40000 ALTER TABLE `cache` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -181,7 +183,7 @@ CREATE TABLE `inventory_logs` (
   KEY `inventory_logs_order_id_foreign` (`order_id`),
   CONSTRAINT `inventory_logs_menu_item_id_foreign` FOREIGN KEY (`menu_item_id`) REFERENCES `menu_items` (`id`) ON DELETE CASCADE,
   CONSTRAINT `inventory_logs_order_id_foreign` FOREIGN KEY (`order_id`) REFERENCES `orders` (`id`) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=9 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -190,6 +192,7 @@ CREATE TABLE `inventory_logs` (
 
 LOCK TABLES `inventory_logs` WRITE;
 /*!40000 ALTER TABLE `inventory_logs` DISABLE KEYS */;
+INSERT INTO `inventory_logs` VALUES (1,3,1,-1,'sale','2026-11-09 11:42:21','2026-11-09 11:42:21'),(2,6,1,-1,'sale','2026-11-09 11:42:21','2026-11-09 11:42:21'),(3,7,1,-3,'sale','2026-11-09 11:42:21','2026-11-09 11:42:21'),(4,3,1,-1,'sale','2026-11-09 11:45:23','2026-11-09 11:45:23'),(5,10,1,-1,'sale','2026-11-09 11:45:24','2026-11-09 11:45:24'),(6,1,2,-1,'sale','2026-11-09 11:59:30','2026-11-09 11:59:30'),(7,2,2,-1,'sale','2026-11-09 11:59:30','2026-11-09 11:59:30'),(8,3,2,-1,'sale','2026-11-09 11:59:30','2026-11-09 11:59:30');
 /*!40000 ALTER TABLE `inventory_logs` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -285,7 +288,7 @@ CREATE TABLE `menu_items` (
 
 LOCK TABLES `menu_items` WRITE;
 /*!40000 ALTER TABLE `menu_items` DISABLE KEYS */;
-INSERT INTO `menu_items` VALUES (1,1,'Negombo Crispy Calamari Rings','Golden fried lagoon calamari tossed with curry leaves, crushed black pepper, and lime aioli.',1850.00,680.00,1,0,40,NULL,'2026-11-09 01:42:33','2026-11-09 01:42:33'),(2,1,'Roasted Pumpkin & Coconut Veloute','Silky heirloom pumpkin soup infused with toasted cumin and Ceylon cinnamon croutons.',1250.00,390.00,1,0,-1,NULL,'2026-11-09 01:42:33','2026-11-09 01:42:33'),(3,1,'Mutton Rolls with Kochchi Dip (3 Pcs)','Traditional spiced slow-cooked mutton and potato croquettes crumb-fried to perfection.',1450.00,520.00,1,0,25,NULL,'2026-11-09 01:42:33','2026-11-09 01:42:33'),(4,2,'Jaffna Lagoon Crab Curry & Roast Paan','Signature mud crab simmered in roasted northern spices, drumstick leaves, and thick coconut milk.',4600.00,1950.00,1,0,15,NULL,'2026-11-09 01:42:33','2026-11-09 01:42:33'),(5,2,'Odara Signature Lamprais','Dutch-Burgher banana-leaf baked samba rice with mixed meat curry, seeni sambol, frikkadels, and ash plantain.',2950.00,1100.00,1,0,30,NULL,'2026-11-09 01:42:33','2026-11-09 01:42:33'),(6,2,'Chargrilled Mahi-Mahi Fillet','Southern coast mahi-mahi with garlic herb butter, whipped potato mash, and grilled asparagus.',3400.00,1320.00,1,0,20,NULL,'2026-11-09 01:42:33','2026-11-09 01:42:33'),(7,3,'Kithul Jaggery Watalappan','Steamed spiced coconut custard sweetened with pure kithul jaggery and roasted cashews.',1150.00,340.00,1,0,35,NULL,'2026-11-09 01:42:33','2026-11-09 01:42:33'),(8,3,'Warm Dark Chocolate Lava Cake','70% single-origin chocolate fondant served with Madagascar vanilla bean gelato.',1550.00,490.00,1,0,20,NULL,'2026-11-09 01:42:33','2026-11-09 01:42:33'),(9,4,'Chilled King Coconut (Thambili)','Freshly harvested golden Sri Lankan king coconut served chilled (VAT Exempt natural produce).',650.00,180.00,1,1,-1,NULL,'2026-11-09 01:42:33','2026-11-09 01:42:33'),(10,4,'Ceylon Artisanal Iced Peach Tea','Nuwara Eliya high-grown broken orange pekoe brewed cold with white peach and mint.',890.00,210.00,1,0,-1,NULL,'2026-11-09 01:42:33','2026-11-09 01:42:33'),(11,4,'Knuckles Mountain Spring Water (750ml)','Still natural mineral water bottled at the source.',450.00,140.00,1,1,100,NULL,'2026-11-09 01:42:33','2026-11-09 01:42:33');
+INSERT INTO `menu_items` VALUES (1,1,'Negombo Crispy Calamari Rings','Golden fried lagoon calamari tossed with curry leaves, crushed black pepper, and lime aioli.',1850.00,680.00,1,0,39,NULL,'2026-11-09 01:42:33','2026-11-09 11:59:30'),(2,1,'Roasted Pumpkin & Coconut Veloute','Silky heirloom pumpkin soup infused with toasted cumin and Ceylon cinnamon croutons.',1250.00,390.00,1,0,-1,NULL,'2026-11-09 01:42:33','2026-11-09 01:42:33'),(3,1,'Mutton Rolls with Kochchi Dip (3 Pcs)','Traditional spiced slow-cooked mutton and potato croquettes crumb-fried to perfection.',1450.00,520.00,1,0,22,NULL,'2026-11-09 01:42:33','2026-11-09 11:59:30'),(4,2,'Jaffna Lagoon Crab Curry & Roast Paan','Signature mud crab simmered in roasted northern spices, drumstick leaves, and thick coconut milk.',4600.00,1950.00,1,0,15,NULL,'2026-11-09 01:42:33','2026-11-09 01:42:33'),(5,2,'Odara Signature Lamprais','Dutch-Burgher banana-leaf baked samba rice with mixed meat curry, seeni sambol, frikkadels, and ash plantain.',2950.00,1100.00,1,0,30,NULL,'2026-11-09 01:42:33','2026-11-09 01:42:33'),(6,2,'Chargrilled Mahi-Mahi Fillet','Southern coast mahi-mahi with garlic herb butter, whipped potato mash, and grilled asparagus.',3400.00,1320.00,1,0,19,NULL,'2026-11-09 01:42:33','2026-11-09 11:42:21'),(7,3,'Kithul Jaggery Watalappan','Steamed spiced coconut custard sweetened with pure kithul jaggery and roasted cashews.',1150.00,340.00,1,0,32,NULL,'2026-11-09 01:42:33','2026-11-09 11:42:21'),(8,3,'Warm Dark Chocolate Lava Cake','70% single-origin chocolate fondant served with Madagascar vanilla bean gelato.',1550.00,490.00,1,0,20,NULL,'2026-11-09 01:42:33','2026-11-09 01:42:33'),(9,4,'Chilled King Coconut (Thambili)','Freshly harvested golden Sri Lankan king coconut served chilled (VAT Exempt natural produce).',650.00,180.00,1,1,-1,NULL,'2026-11-09 01:42:33','2026-11-09 01:42:33'),(10,4,'Ceylon Artisanal Iced Peach Tea','Nuwara Eliya high-grown broken orange pekoe brewed cold with white peach and mint.',890.00,210.00,1,0,-1,NULL,'2026-11-09 01:42:33','2026-11-09 01:42:33'),(11,4,'Knuckles Mountain Spring Water (750ml)','Still natural mineral water bottled at the source.',450.00,140.00,1,1,100,NULL,'2026-11-09 01:42:33','2026-11-09 01:42:33');
 /*!40000 ALTER TABLE `menu_items` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -301,7 +304,7 @@ CREATE TABLE `migrations` (
   `migration` varchar(255) NOT NULL,
   `batch` int(11) NOT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=13 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=14 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -310,7 +313,7 @@ CREATE TABLE `migrations` (
 
 LOCK TABLES `migrations` WRITE;
 /*!40000 ALTER TABLE `migrations` DISABLE KEYS */;
-INSERT INTO `migrations` VALUES (1,'0000_01_01_000000_create_roles_table',1),(2,'0001_01_01_000000_create_users_table',1),(3,'0001_01_01_000001_create_cache_table',1),(4,'0001_01_01_000002_create_jobs_table',1),(5,'2026_11_09_040038_create_restaurant_tables_table',1),(6,'2026_11_09_040039_create_categories_table',1),(7,'2026_11_09_040040_create_menu_items_table',1),(8,'2026_11_09_040041_create_orders_table',1),(9,'2026_11_09_040042_create_order_batches_table',1),(10,'2026_11_09_040043_create_order_items_table',1),(11,'2026_11_09_040044_create_inventory_logs_table',1),(12,'2026_11_09_040045_create_audit_logs_table',1);
+INSERT INTO `migrations` VALUES (1,'0000_01_01_000000_create_roles_table',1),(2,'0001_01_01_000000_create_users_table',1),(3,'0001_01_01_000001_create_cache_table',1),(4,'0001_01_01_000002_create_jobs_table',1),(5,'2026_11_09_040038_create_restaurant_tables_table',1),(6,'2026_11_09_040039_create_categories_table',1),(7,'2026_11_09_040040_create_menu_items_table',1),(8,'2026_11_09_040041_create_orders_table',1),(9,'2026_11_09_040042_create_order_batches_table',1),(10,'2026_11_09_040043_create_order_items_table',1),(11,'2026_11_09_040044_create_inventory_logs_table',1),(12,'2026_11_09_040045_create_audit_logs_table',1),(13,'2026_11_09_180000_add_billing_fields_to_orders_table',2);
 /*!40000 ALTER TABLE `migrations` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -331,7 +334,7 @@ CREATE TABLE `order_batches` (
   PRIMARY KEY (`id`),
   KEY `order_batches_order_id_foreign` (`order_id`),
   CONSTRAINT `order_batches_order_id_foreign` FOREIGN KEY (`order_id`) REFERENCES `orders` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -340,6 +343,7 @@ CREATE TABLE `order_batches` (
 
 LOCK TABLES `order_batches` WRITE;
 /*!40000 ALTER TABLE `order_batches` DISABLE KEYS */;
+INSERT INTO `order_batches` VALUES (1,1,1,'delivered','2026-11-09 11:42:21','2026-11-09 11:50:16'),(2,1,2,'delivered','2026-11-09 11:45:23','2026-11-09 11:50:18'),(3,2,1,'pending','2026-11-09 11:59:30','2026-11-09 11:59:30');
 /*!40000 ALTER TABLE `order_batches` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -366,7 +370,7 @@ CREATE TABLE `order_items` (
   KEY `order_items_menu_item_id_foreign` (`menu_item_id`),
   CONSTRAINT `order_items_menu_item_id_foreign` FOREIGN KEY (`menu_item_id`) REFERENCES `menu_items` (`id`),
   CONSTRAINT `order_items_order_batch_id_foreign` FOREIGN KEY (`order_batch_id`) REFERENCES `order_batches` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=9 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -375,6 +379,7 @@ CREATE TABLE `order_items` (
 
 LOCK TABLES `order_items` WRITE;
 /*!40000 ALTER TABLE `order_items` DISABLE KEYS */;
+INSERT INTO `order_items` VALUES (1,1,3,1,1450.00,1450.00,NULL,'served','2026-11-09 11:42:21','2026-11-09 11:58:01'),(2,1,6,1,3400.00,3400.00,NULL,'served','2026-11-09 11:42:21','2026-11-09 11:58:01'),(3,1,7,3,1150.00,3450.00,NULL,'served','2026-11-09 11:42:21','2026-11-09 11:58:01'),(4,2,3,1,1450.00,1450.00,NULL,'served','2026-11-09 11:45:23','2026-11-09 11:58:01'),(5,2,10,1,890.00,890.00,NULL,'served','2026-11-09 11:45:24','2026-11-09 11:58:01'),(6,3,1,1,1850.00,1850.00,NULL,'pending','2026-11-09 11:59:30','2026-11-09 11:59:30'),(7,3,2,1,1250.00,1250.00,NULL,'pending','2026-11-09 11:59:30','2026-11-09 11:59:30'),(8,3,3,1,1450.00,1450.00,NULL,'pending','2026-11-09 11:59:30','2026-11-09 11:59:30');
 /*!40000 ALTER TABLE `order_items` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -400,8 +405,11 @@ CREATE TABLE `orders` (
   `vat_amount` decimal(10,2) NOT NULL DEFAULT 0.00,
   `service_charge_rate` decimal(5,2) NOT NULL DEFAULT 0.00,
   `service_charge_amount` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `extra_charge_label` varchar(100) DEFAULT NULL,
+  `extra_charge_amount` decimal(10,2) NOT NULL DEFAULT 0.00,
   `grand_total` decimal(10,2) NOT NULL DEFAULT 0.00,
   `payment_method` enum('cash','card','online','unpaid') NOT NULL DEFAULT 'unpaid',
+  `bill_requested_at` timestamp NULL DEFAULT NULL,
   `settled_at` timestamp NULL DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
@@ -413,7 +421,7 @@ CREATE TABLE `orders` (
   KEY `orders_order_status_index` (`order_status`),
   CONSTRAINT `orders_discount_approved_by_foreign` FOREIGN KEY (`discount_approved_by`) REFERENCES `users` (`id`) ON DELETE SET NULL,
   CONSTRAINT `orders_restaurant_table_id_foreign` FOREIGN KEY (`restaurant_table_id`) REFERENCES `restaurant_tables` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -422,6 +430,7 @@ CREATE TABLE `orders` (
 
 LOCK TABLES `orders` WRITE;
 /*!40000 ALTER TABLE `orders` DISABLE KEYS */;
+INSERT INTO `orders` VALUES (1,1,'01e24954-912f-4dfb-91c4-18f52a52b1ce','kkkk','0702132852','settled',10640.00,100.00,10640.00,2,18.00,0.00,10.00,0.00,NULL,0.00,0.00,'cash',NULL,'2026-11-09 11:58:01','2026-11-09 11:42:21','2026-11-09 11:58:01'),(2,3,'29334d86-1968-44bb-951c-19d7b1790213','uuuuuuuuu','0702132852','pending_confirmation',4550.00,0.00,0.00,NULL,18.00,819.00,10.00,455.00,NULL,0.00,5824.00,'unpaid',NULL,NULL,'2026-11-09 11:59:30','2026-11-09 11:59:30');
 /*!40000 ALTER TABLE `orders` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -475,7 +484,7 @@ CREATE TABLE `restaurant_tables` (
 
 LOCK TABLES `restaurant_tables` WRITE;
 /*!40000 ALTER TABLE `restaurant_tables` DISABLE KEYS */;
-INSERT INTO `restaurant_tables` VALUES (1,'T-01','dc325d32-5d25-487c-ad2a-262b30f7fb3b','vacant','2026-11-09 01:42:33','2026-11-09 01:42:33'),(2,'T-02','e9e427f2-87f2-416d-bfc2-e5b071ae117d','vacant','2026-11-09 01:42:33','2026-11-09 01:42:33'),(3,'T-03','ef0245d9-f04d-4585-8ff5-4f62f5d8b5c4','vacant','2026-11-09 01:42:33','2026-11-09 01:42:33'),(4,'T-04','aac146e0-c5ba-42dd-82b7-baa877868d22','vacant','2026-11-09 01:42:33','2026-11-09 01:42:33'),(5,'T-05','42ae29b1-ffbc-4561-bb93-d446cd26da57','vacant','2026-11-09 01:42:33','2026-11-09 01:42:33'),(6,'T-06','5c3c2050-0308-4c76-a031-a353bac6c09a','vacant','2026-11-09 01:42:33','2026-11-09 01:42:33'),(7,'T-07','d4dd5507-c4f8-47af-a7b8-42608decbdef','vacant','2026-11-09 01:42:33','2026-11-09 01:42:33'),(8,'T-08','0567cd47-f79a-465a-9f1a-f9a9a703bc70','vacant','2026-11-09 01:42:33','2026-11-09 01:42:33');
+INSERT INTO `restaurant_tables` VALUES (1,'T-01','dc325d32-5d25-487c-ad2a-262b30f7fb3b','vacant','2026-11-09 01:42:33','2026-11-09 11:58:01'),(2,'T-02','e9e427f2-87f2-416d-bfc2-e5b071ae117d','vacant','2026-11-09 01:42:33','2026-11-09 01:42:33'),(3,'T-03','ef0245d9-f04d-4585-8ff5-4f62f5d8b5c4','occupied','2026-11-09 01:42:33','2026-11-09 11:59:30'),(4,'T-04','aac146e0-c5ba-42dd-82b7-baa877868d22','vacant','2026-11-09 01:42:33','2026-11-09 01:42:33'),(5,'T-05','42ae29b1-ffbc-4561-bb93-d446cd26da57','vacant','2026-11-09 01:42:33','2026-11-09 01:42:33'),(6,'T-06','5c3c2050-0308-4c76-a031-a353bac6c09a','vacant','2026-11-09 01:42:33','2026-11-09 01:42:33'),(7,'T-07','d4dd5507-c4f8-47af-a7b8-42608decbdef','vacant','2026-11-09 01:42:33','2026-11-09 01:42:33'),(8,'T-08','0567cd47-f79a-465a-9f1a-f9a9a703bc70','vacant','2026-11-09 01:42:33','2026-11-09 01:42:33');
 /*!40000 ALTER TABLE `restaurant_tables` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -533,6 +542,7 @@ CREATE TABLE `sessions` (
 
 LOCK TABLES `sessions` WRITE;
 /*!40000 ALTER TABLE `sessions` DISABLE KEYS */;
+INSERT INTO `sessions` VALUES ('9Kkz0bkz7d9FztX6EuipQ1xo8GJ6ARrirEEqF5v3',NULL,'127.0.0.1','Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36','ZXlKcGRpSTZJazVZYmpKb2JXeGxiSEE1ZERKUk4ycGphRGxRVDJjOVBTSXNJblpoYkhWbElqb2lhSE5LVFVWa2FrazFTbUpVYlU5cVJscEtSbTVVTUhCWlZFeFliR3ByYVZKSlNVdGhRVWtyYWs1eGMwMU9jakl6VUhVd1IwOTBjMGMxTkRKc1NXazRWRmRETTJoT1NURlFZVUppVVRONGVqSlBTMlJST1ZoemMzRm1VV2xQV0VkSGFFZDRVRVZ4Y0M5eVdHMVlUMUJ3VVdsek5rczNkalZZYlZsUFlXazVSSFFpTENKdFlXTWlPaUk0WXpjME1UWTRZbVJpTjJJNE56Wm1aVFptWVRJMVptVXlNamhsTVdFeVpUZzRPVE5oWkRSbE16ZzNOekk0TTJJelpHRTFOR1JpTVdWalltRXlZekE0SWl3aWRHRm5Jam9pSW4wPQ==',1794243765),('EIz3fGn7UbdyYdBZRLSWxHTwkU5vYuL0y6mmQYyI',NULL,'127.0.0.1','Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36','ZXlKcGRpSTZJa0ZaVXpkellVTkdObUpvUmxoblRFVnFTSEpJZGtFOVBTSXNJblpoYkhWbElqb2lTbEJUVVZKQ2FpdHlRbWx3TlhSTU1FdEVVVWx3WlVSR1pIaGFSVUphTlhSVlduQklZV0p1VDIxQlVUbEhielZtWkhKMlEzcE9WbmRtVkV4elEwUkpOVFZoVkdwV2NpOVRSbUZOUWxOUVMwZE5ZVEp2ZVZFME5HWnVaV1F3T0ZOd2R6SXhhMjlVUkhGRGNXc3dNM1YzTkdGU0wyODNNbFppVEZCeVJIa3JWVFpCU1ZGNGRGcG1ObEpNU25aa1YxazBlVUpJZWxGUmNEUkhNMUpMVW1GclJYcDViR05rU1hGQlRYRjVUbmhQVDB4eFdYTm5ObkF6VFV0MWFUQkNaMFE1UzAxVVZFOVdRMHRVYmxaS2VscFdVVVZQT1dKS05EQXpUV1puVFVKWFdEZDVZbGhNZFN0SmQxWktTV2REUWpVeWFVeDNXRXBWZDJGWmJ6bDZUVlF5TjFjeVRHdFZNRU00VFdKVE1tbFpSVFZPZUZONldYVjBlbFJQYmtKeldGRmFUMVZVTlhGRVVuRk5abnAzWkdsMVFqQkZRMjVJV0doSmFIVjZZa0U0WW5raUxDSnRZV01pT2lKaFkyWmpNV0ZqTWpkaU9XTXhaVEV5TXpSaFltRmlPR1JoT0dRM01EWmpNbUV4TnpFMk1UZzNOVGxqTVRnMFl6a3daREZrTnpFMU56ZzRNekE0TURaa0lpd2lkR0ZuSWpvaUluMD0=',1794246691),('R5Gcz4fj9ofSLt1CnsQDcRuWEiPnlSNgciV37zBT',NULL,'127.0.0.1','Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36','ZXlKcGRpSTZJalZCUkRWNVdYcHRORXcxZUdFd2J6UTBURkJTY0hjOVBTSXNJblpoYkhWbElqb2lOakZuV0RBclNuaFlhMWd2UjBaRWVUUndObFZxU1ZWVVJrdEtVM0pQU1ZobE9Xa3lUR05yU1dOemNXbG1UelpEU201NU5WUTJZbVJVYVVzMlQxSnpWWEZNUTJWek1qbHFXVmxNUW1KVE1rdGpOM1pKVjBWVk5GZEJRVlZWTkRSelYwZEpiWGxXVkZneVZTdFdRMHhsY25CbGNuWjFWR1pOWlZCU1prUlZhR3NpTENKdFlXTWlPaUkzWmprM09UY3lOV0kxTnpSak1qbGxOVEU0WXpjeE5tTm1OVGd6Wkdaa016VTFOV0kxT0dFMVlUUXpZVEppTkdRMk16ZzNOMkpoWVdVME9UWTNNMll3SWl3aWRHRm5Jam9pSW4wPQ==',1794244826),('SRvW6XOIU5j8P5ejmzUjEM73ScWZrBxqrYQtOiv7',NULL,'127.0.0.1','Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36','ZXlKcGRpSTZJalJIZG5aeFJqVnJUVFJyWlRoVlVTdElTMngxUzFFOVBTSXNJblpoYkhWbElqb2laRGwyZEdOU1RESmpSUzlDZEVoS1NqVmFjMUZDU2tsQlprSTBaQ3Q2ZUZjNVYwbDFkMHBCWmxoR1QyMVFRMXBYWTNWa1FrcEdUbU5uUzJOdGJIQndiRzVyYTFSS2RXaFVZa05hTHpoSldGcHFTalZzZDFabGRWZzJVa1JtTUZWQ1oyc3ZaVTQ0T0RaRFVVSklRVVp3TUZnMlpGRjBiVGt2UVZwQlVGaHhXVGxVV1ZkMmNrdHBVVlJLSzNrM1JuWXdOazFZUmlzelprZEJkbTVqTDBKWVV6aFlaemRUWm1ReVZsVXJUVzF5ZUV0RWRDdGpiV2hNV0d4VmNGTndXWHB3YzJsT2RrcDZPVkpyZVdac2FXaDZNMkZSVVVvMFVUMDlJaXdpYldGaklqb2laVGt6WmpFMFpXWTROamcxTm1JM09UZzNOVGM1T1RKaE5UTmpZVGhoTWpVeFlXTTNNakJqTURnek9ERTFNREUzWXpjMU9XUXlOVEprT1RReE1UVmxPQ0lzSW5SaFp5STZJaUo5',1794244230);
 /*!40000 ALTER TABLE `sessions` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -585,4 +595,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-11-09 12:43:28
+-- Dump completed on 2026-11-10  8:03:40

@@ -7,7 +7,8 @@
      x-data="staffQueueApp({
          initialPayload: @js($initialPayload),
          pollUrl: @js(route('staff.dashboard', ['poll' => 1])),
-         csrfToken: @js(csrf_token())
+         csrfToken: @js(csrf_token()),
+         firstTableId: {{ $tables->first()?->id ?? 1 }}
      })"
      x-init="initPoller()">
 
@@ -18,16 +19,23 @@
                 <span class="inline-block h-2.5 w-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
                 <span class="text-xs font-bold uppercase tracking-wider text-amber-400">Handheld Sales Assistant View &bull; 3s Live Polling</span>
             </div>
-            <h1 class="mt-1 text-2xl font-extrabold text-white">Active Table Orders &amp; Station Routing</h1>
+            <h1 class="mt-1 text-2xl font-extrabold text-white">Active Table Orders, Walk-In Ordering &amp; Billing Dispatch</h1>
             <p class="text-xs text-slate-400">Last synced: <span x-text="payload.polled_at"></span></p>
         </div>
 
         <div class="flex flex-wrap items-center gap-3">
+            <!-- Create New Assisted / Walk-In Order Button (For Customers Without QR Phone) -->
+            <button type="button"
+                    @click="openWalkInModal()"
+                    class="rounded-xl bg-amber-500 px-4 py-2.5 text-xs font-extrabold text-slate-950 shadow-lg transition hover:bg-amber-400">
+                + Create Assisted / Walk-In Order
+            </button>
+
             <button type="button"
                     @click="soundEnabled = !soundEnabled; if (soundEnabled) playChime()"
                     :class="soundEnabled ? 'border-emerald-500/40 bg-emerald-500/15 text-emerald-300' : 'border-slate-700 bg-slate-800 text-slate-400'"
                     class="rounded-xl border px-3.5 py-2 text-xs font-bold transition">
-                <span x-text="soundEnabled ? '🔊 Web Audio Chime: ON' : '🔇 Tap to Enable Audio Chime'"></span>
+                <span x-text="soundEnabled ? '🔊 Chime: ON' : '🔇 Chime: OFF'"></span>
             </button>
 
             <div class="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-center">
@@ -47,7 +55,7 @@
                     <!-- Card Header -->
                     <div class="flex items-start justify-between gap-3 border-b border-slate-800 pb-4">
                         <div>
-                            <div class="flex items-center gap-2">
+                            <div class="flex flex-wrap items-center gap-2">
                                 <span class="rounded-lg bg-amber-500 px-3 py-1 text-sm font-extrabold text-slate-950"
                                       x-text="'TABLE ' + order.table_number"></span>
                                 <span class="font-mono text-xs text-slate-400" x-text="'#' + order.id"></span>
@@ -65,6 +73,9 @@
                                   x-text="order.order_status.replace('_', ' ')"></span>
                             <div class="mt-1 text-xs font-bold text-slate-300">
                                 Total: LKR <span x-text="order.grand_total"></span>
+                            </div>
+                            <div x-show="order.is_sent_to_cashier" class="mt-1 text-[10px] font-extrabold uppercase text-emerald-400">
+                                ✓ Sent to Cashier Billing
                             </div>
                         </div>
                     </div>
@@ -135,14 +146,21 @@
                     </div>
                 </div>
 
-                <!-- Staff Verbal Add-On Action Footer -->
-                <div class="mt-4 flex items-center justify-between border-t border-slate-800 pt-3">
-                    <span class="text-xs text-slate-400">Verbal table request?</span>
-                    <button type="button"
-                            @click="openStaffAddonModal(order)"
-                            class="rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-1.5 text-xs font-bold text-amber-300 transition hover:bg-amber-500 hover:text-slate-950">
-                        + Append Verbal Add-On Batch
-                    </button>
+                <!-- Staff Verbal Add-On & Final Send-to-Cashier Action Footer -->
+                <div class="mt-4 space-y-2.5 border-t border-slate-800 pt-3">
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                        <button type="button"
+                                @click="openStaffAddonModal(order)"
+                                class="rounded-xl border border-amber-500/40 bg-amber-500/10 px-3.5 py-2 text-xs font-bold text-amber-300 transition hover:bg-amber-500 hover:text-slate-950">
+                            + Add Verbal Items to Order
+                        </button>
+
+                        <button type="button"
+                                @click="sendToCashier(order.id)"
+                                class="rounded-xl bg-emerald-500 px-4 py-2 text-xs font-extrabold text-slate-950 shadow transition hover:bg-emerald-400">
+                            🧾 Confirm Completed &amp; Send to Cashier Billing
+                        </button>
+                    </div>
                 </div>
             </div>
         </template>
@@ -150,15 +168,121 @@
 
     <div x-show="payload.orders.length === 0" class="mt-8 rounded-3xl border border-slate-800 bg-slate-900 p-12 text-center">
         <p class="text-base font-bold text-slate-300">No active table orders right now.</p>
-        <p class="mt-1 text-xs text-slate-500">New guest QR orders will appear automatically with an audio chime.</p>
+        <p class="mt-1 text-xs text-slate-500">Click "+ Create Assisted / Walk-In Order" above or wait for guest QR orders.</p>
     </div>
 
-    <!-- Staff Verbal Add-On Modal -->
+    <!-- Modal 1: Create New Walk-In / Assisted Table Order (For Customers Without QR Phone) -->
+    <div x-show="walkInModalOpen"
+         x-cloak
+         class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 p-4 backdrop-blur-sm">
+        <div class="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-3xl border border-slate-800 bg-slate-900 p-6 shadow-2xl">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                <div>
+                    <span class="text-[11px] font-bold uppercase tracking-wider text-amber-400">Assisted Waitstaff Ordering</span>
+                    <h3 class="text-lg font-extrabold text-white">Create New Table Order (Walk-In / Non-QR Guest)</h3>
+                </div>
+                <button type="button" @click="walkInModalOpen = false" class="rounded-lg bg-slate-800 px-2.5 py-1 text-xs font-bold text-slate-300 hover:text-white">
+                    Close &times;
+                </button>
+            </div>
+
+            <form method="POST" action="{{ route('staff.orders.create') }}" class="mt-4 space-y-4">
+                @csrf
+                <div class="grid gap-3 sm:grid-cols-3">
+                    <div>
+                        <label class="block text-xs font-bold uppercase tracking-wider text-slate-400">Select Table *</label>
+                        <select name="restaurant_table_id" x-model="walkInTableId" required
+                                class="mt-1 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-xs font-bold text-white">
+                            @foreach ($tables as $tbl)
+                                <option value="{{ $tbl->id }}">
+                                    Table {{ $tbl->table_number }} ({{ strtoupper($tbl->status) }})
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold uppercase tracking-wider text-slate-400">Customer Name *</label>
+                        <input type="text" name="customer_name" x-model="walkInName" required maxlength="100"
+                               placeholder="e.g., Walk-In Guest"
+                               class="mt-1 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-white">
+                    </div>
+
+                    <div>
+                        <div class="flex items-center justify-between">
+                            <label class="block text-xs font-bold uppercase tracking-wider text-slate-400">Customer Mobile *</label>
+                            <button type="button"
+                                    @click="walkInPhone = '0770000000'; if (!walkInName) walkInName = 'Walk-In Guest'"
+                                    class="text-[10px] font-bold text-amber-400 hover:underline">
+                                No Phone? Use Default
+                            </button>
+                        </div>
+                        <input type="tel" name="customer_phone" x-model="walkInPhone" required maxlength="20"
+                               placeholder="0771234567"
+                               class="mt-1 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-white">
+                    </div>
+                </div>
+
+                <!-- Menu Item Selector -->
+                <div class="max-h-72 space-y-3 overflow-y-auto rounded-2xl border border-slate-800 bg-slate-950 p-3.5">
+                    @foreach ($categories as $category)
+                        <div class="pt-1 text-xs font-extrabold uppercase tracking-wider text-amber-400">
+                            {{ $category->name }} ({{ strtoupper($category->station) }})
+                        </div>
+                        @foreach ($category->menuItems as $item)
+                            <div class="rounded-xl border border-slate-800 bg-slate-900 p-3">
+                                <div class="flex items-center justify-between gap-2">
+                                    <div>
+                                        <div class="text-xs font-bold text-white">{{ $item->name }}</div>
+                                        <div class="text-[11px] text-slate-400">LKR {{ number_format((float) $item->price, 2) }}</div>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <button type="button" @click="decWalkIn({{ $item->id }})" class="h-7 w-7 rounded-lg bg-slate-800 text-xs font-bold text-white">&minus;</button>
+                                        <span class="w-5 text-center text-xs font-bold text-white" x-text="walkInQty({{ $item->id }})"></span>
+                                        <button type="button" @click="incWalkIn({ id: {{ $item->id }}, name: @js($item->name), price: {{ (float) $item->price }} })" class="h-7 w-7 rounded-lg bg-amber-500 text-xs font-bold text-slate-950">+</button>
+                                    </div>
+                                </div>
+                                <div x-show="walkInQty({{ $item->id }}) > 0" x-cloak class="mt-2">
+                                    <input type="text"
+                                           :value="walkInNotes({{ $item->id }})"
+                                           @input="setWalkInNotes({{ $item->id }}, $event.target.value)"
+                                           placeholder="Kitchen/Bar note (e.g., less spicy, no sugar)..."
+                                           class="w-full rounded-lg border border-slate-700 bg-slate-950 px-2.5 py-1 text-[11px] text-white">
+                                </div>
+                            </div>
+                        @endforeach
+                    @endforeach
+                </div>
+
+                <template x-for="(item, idx) in walkInItemsArray" :key="item.id">
+                    <div>
+                        <input type="hidden" :name="`items[${idx}][menu_item_id]`" :value="item.id">
+                        <input type="hidden" :name="`items[${idx}][quantity]`" :value="item.quantity">
+                        <input type="hidden" :name="`items[${idx}][notes]`" :value="item.notes">
+                    </div>
+                </template>
+
+                <div class="flex items-center justify-between border-t border-slate-800 pt-3">
+                    <div class="text-xs text-slate-300">
+                        Selected Items: <span class="font-extrabold text-white" x-text="walkInItemsArray.reduce((s, i) => s + i.quantity, 0)"></span>
+                        &bull; Subtotal: <span class="font-extrabold text-amber-400">LKR <span x-text="walkInItemsArray.reduce((s, i) => s + (i.price * i.quantity), 0).toFixed(2)"></span></span>
+                    </div>
+
+                    <button type="submit"
+                            :disabled="walkInItemsArray.length === 0 || !walkInName || !walkInPhone"
+                            class="rounded-2xl bg-amber-500 px-6 py-3 text-xs font-extrabold text-slate-950 shadow-lg transition hover:bg-amber-400 disabled:opacity-40">
+                        ✓ Create &amp; Confirm Table Order
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal 2: Staff Verbal Add-On Modal (For Existing Active Orders) -->
     <div x-show="addonModalOpen"
          x-cloak
          class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm">
-        <div @click.away="addonModalOpen = false"
-             class="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-3xl border border-slate-800 bg-slate-900 p-6 shadow-2xl">
+        <div class="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-3xl border border-slate-800 bg-slate-900 p-6 shadow-2xl">
             <div class="flex items-center justify-between border-b border-slate-800 pb-3">
                 <h3 class="text-base font-extrabold text-white">
                     Append Verbal Add-On &bull; Table <span x-text="selectedOrder ? selectedOrder.table_number : ''"></span>
@@ -172,15 +296,24 @@
                     @foreach ($categories as $category)
                         <div class="pt-2 text-xs font-bold uppercase tracking-wider text-amber-400">{{ $category->name }} ({{ strtoupper($category->station) }})</div>
                         @foreach ($category->menuItems as $item)
-                            <div class="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-950 px-3 py-2">
-                                <div>
-                                    <div class="text-xs font-bold text-white">{{ $item->name }}</div>
-                                    <div class="text-[11px] text-slate-400">LKR {{ number_format((float) $item->price, 2) }}</div>
+                            <div class="rounded-xl border border-slate-800 bg-slate-950 p-3">
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <div class="text-xs font-bold text-white">{{ $item->name }}</div>
+                                        <div class="text-[11px] text-slate-400">LKR {{ number_format((float) $item->price, 2) }}</div>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <button type="button" @click="decAddon({{ $item->id }})" class="h-7 w-7 rounded-lg bg-slate-800 text-xs font-bold text-white">&minus;</button>
+                                        <span class="w-5 text-center text-xs font-bold text-white" x-text="addonQty({{ $item->id }})"></span>
+                                        <button type="button" @click="incAddon({ id: {{ $item->id }}, name: @js($item->name) })" class="h-7 w-7 rounded-lg bg-amber-500 text-xs font-bold text-slate-950">+</button>
+                                    </div>
                                 </div>
-                                <div class="flex items-center gap-2">
-                                    <button type="button" @click="decAddon({{ $item->id }})" class="h-7 w-7 rounded-lg bg-slate-800 text-xs font-bold text-white">&minus;</button>
-                                    <span class="w-5 text-center text-xs font-bold text-white" x-text="addonQty({{ $item->id }})"></span>
-                                    <button type="button" @click="incAddon({ id: {{ $item->id }}, name: @js($item->name) })" class="h-7 w-7 rounded-lg bg-amber-500 text-xs font-bold text-slate-950">+</button>
+                                <div x-show="addonQty({{ $item->id }}) > 0" x-cloak class="mt-2">
+                                    <input type="text"
+                                           :value="addonNotes({{ $item->id }})"
+                                           @input="setAddonNotes({{ $item->id }}, $event.target.value)"
+                                           placeholder="Kitchen/Bar note..."
+                                           class="w-full rounded-lg border border-slate-700 bg-slate-900 px-2.5 py-1 text-[11px] text-white">
                                 </div>
                             </div>
                         @endforeach
@@ -191,6 +324,7 @@
                     <div>
                         <input type="hidden" :name="`items[${idx}][menu_item_id]`" :value="item.id">
                         <input type="hidden" :name="`items[${idx}][quantity]`" :value="item.quantity">
+                        <input type="hidden" :name="`items[${idx}][notes]`" :value="item.notes">
                     </div>
                 </template>
 
@@ -214,6 +348,12 @@ function staffQueueApp(config) {
         addonModalOpen: false,
         selectedOrder: null,
         staffAddons: {},
+
+        walkInModalOpen: false,
+        walkInTableId: config.firstTableId,
+        walkInName: '',
+        walkInPhone: '',
+        walkInCart: {},
 
         initPoller() {
             setInterval(() => {
@@ -284,6 +424,21 @@ function staffQueueApp(config) {
             });
         },
 
+        sendToCashier(orderId) {
+            fetch(`/staff/orders/${orderId}/send-to-cashier`, {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': config.csrfToken,
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.payload) this.payload = data.payload;
+            });
+        },
+
         cancelItem(itemId) {
             if (!confirm('Cancel this item and restore stock?')) return;
             fetch(`/staff/items/${itemId}/cancel`, {
@@ -300,6 +455,46 @@ function staffQueueApp(config) {
             });
         },
 
+        openWalkInModal() {
+            this.walkInName = '';
+            this.walkInPhone = '';
+            this.walkInCart = {};
+            this.walkInModalOpen = true;
+        },
+
+        get walkInItemsArray() {
+            return Object.values(this.walkInCart);
+        },
+
+        walkInQty(id) {
+            return this.walkInCart[id] ? this.walkInCart[id].quantity : 0;
+        },
+
+        walkInNotes(id) {
+            return this.walkInCart[id] ? this.walkInCart[id].notes : '';
+        },
+
+        setWalkInNotes(id, val) {
+            if (this.walkInCart[id]) this.walkInCart[id].notes = val;
+        },
+
+        incWalkIn(item) {
+            if (!this.walkInCart[item.id]) {
+                this.walkInCart[item.id] = { id: item.id, name: item.name, price: Number(item.price), quantity: 1, notes: '' };
+            } else {
+                this.walkInCart[item.id].quantity++;
+            }
+        },
+
+        decWalkIn(id) {
+            if (!this.walkInCart[id]) return;
+            if (this.walkInCart[id].quantity <= 1) {
+                delete this.walkInCart[id];
+            } else {
+                this.walkInCart[id].quantity--;
+            }
+        },
+
         openStaffAddonModal(order) {
             this.selectedOrder = order;
             this.staffAddons = {};
@@ -314,9 +509,17 @@ function staffQueueApp(config) {
             return this.staffAddons[id] ? this.staffAddons[id].quantity : 0;
         },
 
+        addonNotes(id) {
+            return this.staffAddons[id] ? this.staffAddons[id].notes : '';
+        },
+
+        setAddonNotes(id, val) {
+            if (this.staffAddons[id]) this.staffAddons[id].notes = val;
+        },
+
         incAddon(item) {
             if (!this.staffAddons[item.id]) {
-                this.staffAddons[item.id] = { id: item.id, name: item.name, quantity: 1 };
+                this.staffAddons[item.id] = { id: item.id, name: item.name, quantity: 1, notes: '' };
             } else {
                 this.staffAddons[item.id].quantity++;
             }
@@ -335,4 +538,3 @@ function staffQueueApp(config) {
 </script>
 @endpush
 @endsection
-

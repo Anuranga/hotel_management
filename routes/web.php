@@ -50,7 +50,9 @@ Route::prefix('staff')
     ->middleware(['auth', 'role:staff,manager,admin'])
     ->group(function (): void {
         Route::get('/dashboard', [StaffOrderController::class, 'index'])->name('dashboard');
+        Route::post('/orders/create', [StaffOrderController::class, 'createWalkInOrder'])->name('orders.create');
         Route::post('/orders/{order}/confirm', [StaffOrderController::class, 'confirmOrder'])->name('orders.confirm');
+        Route::post('/orders/{order}/send-to-cashier', [StaffOrderController::class, 'completeAndSendToCashier'])->name('orders.send-to-cashier');
         Route::post('/batches/{batch}/deliver', [StaffOrderController::class, 'deliverBatch'])->name('batches.deliver');
         Route::post('/orders/{order}/append', [StaffOrderController::class, 'appendStaffItems'])->name('orders.append');
         Route::post('/items/{item}/cancel', [StaffOrderController::class, 'cancelItem'])->name('items.cancel');
@@ -81,6 +83,7 @@ Route::prefix('cashier')
     ->group(function (): void {
         Route::get('/billing', [CashierBillingController::class, 'index'])->name('billing');
         Route::post('/orders/{order}/discount', [CashierBillingController::class, 'applyDiscount'])->name('orders.discount');
+        Route::post('/orders/{order}/append', [CashierBillingController::class, 'appendCashierItems'])->name('orders.append');
         Route::post('/orders/{order}/settle', [CashierBillingController::class, 'settle'])->name('orders.settle');
     });
 

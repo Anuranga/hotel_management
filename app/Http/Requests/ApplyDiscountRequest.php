@@ -17,6 +17,18 @@ class ApplyDiscountRequest extends FormRequest
     }
 
     /**
+     * Sanitize extra charge label before validation.
+     */
+    protected function prepareForValidation(): void
+    {
+        if ($this->has('extra_charge_label')) {
+            $this->merge([
+                'extra_charge_label' => trim(strip_tags((string) $this->input('extra_charge_label', ''))),
+            ]);
+        }
+    }
+
+    /**
      * Get the validation rules that apply to the request.
      *
      * @return array<string, ValidationRule|array<mixed>|string>
@@ -25,6 +37,10 @@ class ApplyDiscountRequest extends FormRequest
     {
         return [
             'discount_percentage' => ['required', 'numeric', 'min:0', 'max:100'],
+            'vat_rate' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'service_charge_rate' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'extra_charge_amount' => ['nullable', 'numeric', 'min:0', 'max:9999999.99'],
+            'extra_charge_label' => ['nullable', 'string', 'max:100'],
             'manager_pin' => ['nullable', 'string', 'max:20'],
         ];
     }

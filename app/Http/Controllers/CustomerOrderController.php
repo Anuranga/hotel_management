@@ -316,6 +316,8 @@ class CustomerOrderController extends Controller
             'vat_amount' => number_format((float) $order->vat_amount, 2, '.', ''),
             'service_charge_rate' => number_format((float) $order->service_charge_rate, 2, '.', ''),
             'service_charge_amount' => number_format((float) $order->service_charge_amount, 2, '.', ''),
+            'extra_charge_label' => $order->extra_charge_label,
+            'extra_charge_amount' => number_format((float) ($order->extra_charge_amount ?? 0), 2, '.', ''),
             'grand_total' => number_format((float) $order->grand_total, 2, '.', ''),
             'updated_at' => $order->updated_at?->toIso8601String(),
             'batches' => $order->batches->map(function (OrderBatch $batch): array {
