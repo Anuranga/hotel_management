@@ -127,14 +127,14 @@
                 <!-- Batch-Level Toggle Buttons: Mark Cooking -> Mark Ready -->
                 <div class="mt-4 grid grid-cols-2 gap-2 border-t border-slate-800 pt-4">
                     <button type="button"
-                            @click="toggleBatch(card.batch_id, 'preparing')"
+                            @click="toggleBatch(card, 'preparing')"
                             :disabled="card.batch_status === 'preparing' || card.batch_status === 'ready'"
                             class="rounded-xl border border-purple-500/40 bg-purple-500/20 py-2.5 text-xs font-extrabold text-purple-200 transition hover:bg-purple-500 hover:text-slate-950 disabled:opacity-40">
                         🔥 Mark Cooking
                     </button>
 
                     <button type="button"
-                            @click="toggleBatch(card.batch_id, 'ready')"
+                            @click="toggleBatch(card, 'ready')"
                             :disabled="card.batch_status === 'ready'"
                             class="rounded-xl bg-emerald-500 py-2.5 text-xs font-extrabold text-slate-950 shadow transition hover:bg-emerald-400 disabled:opacity-40">
                         ✓ Mark Ready
@@ -179,20 +179,52 @@ function kdsStationApp(config) {
             .catch(() => {});
         },
 
-        toggleBatch(batchId, status) {
-            fetch(`/kitchen/batches/${batchId}/status?station=${encodeURIComponent(this.station)}`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json',
-                    'X-CSRF-TOKEN': config.csrfToken,
-                    'X-Requested-With': 'XMLHttpRequest'
-                },
-                body: JSON.stringify({ status })
-            })
-            .then(res => res.json())
-            .then(data => {
-                if (data.payload) this.payload = data.payload;
+        toggleBatch(card, status) {
+            const isReady = status === 'ready';
+            window.hotelConfirm({
+                type: isReady ? 'success' : 'primary',
+                badge: 'Kitchen KDS Batch Status',
+                title: isReady
+                    ? `Mark Table ${card.table_number} (Batch #${card.batch_number}) as READY?`
+                    : `Start Cooking Table ${card.table_number} (Batch #${card.batch_number})?`,
+                message: isReady
+                    ? 'This will notify the Sales Assistant handheld queue that all items in this batch are plated and ready for table pickup.'
+                    : 'This will mark the batch as actively cooking on the line and update the guest live status tracker.',
+                details: [
+                    { label: 'Table Number', value: `Table ${card.table_number}` },
+                    { label: 'Batch Ticket', value: `Batch #${card.batch_number}` },
+                    { label: 'Items Count', value: `${card.items ? card.items.length : 0} item(s)` }
+                ],
+                confirmText: isReady ? '✓ Yes, Mark Batch Ready' : '🔥 Yes, Start Cooking',
+                onConfirm: () => {
+                    fetch(`/kitchen/batches/${card.batch_id}/status?station=${encodeURIComponent(this.station)}`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': config.csrfToken,
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                        body: JSON.stringify({ status })
+                    })
+                    .then(async res => {
+                        const data = await res.json().catch(() => ({}));
+                        if (!res.ok) throw new Error(data.message || 'Unable to update batch status.');
+                        if (data.payload) this.payload = data.payload;
+                        window.hotelNotify({
+                            type: 'success',
+                            title: isReady ? 'Batch Marked Ready' : 'Batch Marked Cooking',
+                            message: data.message || `Table ${card.table_number} Batch #${card.batch_number} is now ${status}.`
+                        });
+                    })
+                    .catch(err => {
+                        window.hotelNotify({
+                            type: 'error',
+                            title: 'KDS Update Failed',
+                            message: err.message || 'Could not update batch status.'
+                        });
+                    });
+                }
             });
         },
 
@@ -207,9 +239,22 @@ function kdsStationApp(config) {
                 },
                 body: JSON.stringify({ item_status: itemStatus })
             })
-            .then(res => res.json())
-            .then(data => {
+            .then(async res => {
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) throw new Error(data.message || 'Unable to update item status.');
                 if (data.payload) this.payload = data.payload;
+                window.hotelNotify({
+                    type: 'info',
+                    title: 'Item Status Updated',
+                    message: data.message || `Item marked as ${itemStatus.toUpperCase()}.`
+                });
+            })
+            .catch(err => {
+                window.hotelNotify({
+                    type: 'error',
+                    title: 'Update Failed',
+                    message: err.message || 'Could not update item status.'
+                });
             });
         }
     };

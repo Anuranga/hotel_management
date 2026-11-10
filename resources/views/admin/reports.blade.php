@@ -273,7 +273,12 @@
             <div class="mt-4 space-y-3">
                 @foreach ($menuItems as $skuItem)
                     <div class="rounded-2xl border border-slate-800 bg-slate-950 p-4">
-                        <form method="POST" action="{{ route('admin.menu-items.update', ['menuItem' => $skuItem->id]) }}" class="grid items-center gap-3 sm:grid-cols-12">
+                        <form method="POST" action="{{ route('admin.menu-items.update', ['menuItem' => $skuItem->id]) }}" class="grid items-center gap-3 sm:grid-cols-12"
+                              data-confirm-type="warning"
+                              data-confirm-badge="Audit-Logged Menu Update"
+                              data-confirm-title="Update Menu SKU '{{ $skuItem->name }}'?"
+                              data-confirm-message="Any change to selling price, COGS cost, availability, or stock level will take effect immediately and be logged in the security audit trail."
+                              data-confirm-button="Yes, Update SKU">
                             @csrf
                             @method('PUT')
                             <input type="hidden" name="category_id" value="{{ $skuItem->category_id }}">
@@ -377,7 +382,12 @@
                             Open Signed QR Link &nearr;
                         </a>
 
-                        <form method="POST" action="{{ route('admin.tables.regenerate-qr', ['table' => $tbl->id]) }}">
+                        <form method="POST" action="{{ route('admin.tables.regenerate-qr', ['table' => $tbl->id]) }}"
+                              data-confirm-type="danger"
+                              data-confirm-badge="Security QR Rotation"
+                              data-confirm-title="Rotate QR Token for Table {{ $tbl->table_number }}?"
+                              data-confirm-message="Generating a new cryptographic UUID will immediately invalidate any previously printed physical QR code stand for Table {{ $tbl->table_number }}. You will need to reprint the new QR code."
+                              data-confirm-button="Yes, Rotate QR Token">
                             @csrf
                             <button type="submit" class="w-full rounded-xl border border-slate-700 bg-slate-950 py-1.5 text-[11px] font-semibold text-slate-300 hover:border-rose-500/50 hover:text-rose-300">
                                 Rotate QR Token UUID

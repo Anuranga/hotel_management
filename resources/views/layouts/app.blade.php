@@ -177,7 +177,11 @@
                         <span x-text="theme === 'light' ? '🌙 Dark' : '☀️ Light'"></span>
                     </button>
 
-                    <form method="POST" action="{{ route('logout') }}" class="ml-1 inline">
+                    <form method="POST" action="{{ route('logout') }}" class="ml-1 inline"
+                          data-confirm-title="Sign Out of Terminal?"
+                          data-confirm-message="You are about to end your active session on this terminal. Any unsaved modal inputs will be cleared."
+                          data-confirm-type="warning"
+                          data-confirm-button="Yes, Sign Out">
                         @csrf
                         <button type="submit" class="rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 text-slate-300 transition hover:border-rose-500/50 hover:text-rose-300">
                             Sign Out ({{ auth()->user()->name }})
@@ -197,30 +201,327 @@
         </div>
     @endauth
 
-    @if (session('status'))
-        <div class="no-print mx-auto max-w-7xl px-4 pt-4">
-            <div class="flex items-center justify-between rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
-                <span>{{ session('status') }}</span>
-            </div>
-        </div>
-    @endif
+    <!-- Enhanced Server-Side Flash & Validation Alerts -->
+    @if (session('status') || session('error') || session('warning') || $errors->any())
+        <div class="no-print mx-auto max-w-7xl space-y-3 px-4 pt-4" x-data="{ showStatus: true, showError: true, showValidation: true }">
+            @if (session('status'))
+                <div x-show="showStatus"
+                     x-transition:enter="transition ease-out duration-200"
+                     x-transition:enter-start="opacity-0 -translate-y-2"
+                     x-transition:enter-end="opacity-100 translate-y-0"
+                     class="flex items-start justify-between gap-4 rounded-2xl border border-emerald-500/40 bg-emerald-500/10 p-4 shadow-lg">
+                    <div class="flex items-start gap-3">
+                        <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-500 text-sm font-extrabold text-slate-950 shadow">
+                            ✓
+                        </span>
+                        <div>
+                            <div class="text-xs font-extrabold uppercase tracking-wider text-emerald-400">Operation Successful</div>
+                            <p class="mt-0.5 text-sm font-semibold text-white">{{ session('status') }}</p>
+                        </div>
+                    </div>
+                    <button type="button" @click="showStatus = false" class="rounded-lg px-2 py-1 text-xs font-bold text-slate-400 hover:bg-slate-800 hover:text-white">
+                        Dismiss &times;
+                    </button>
+                </div>
+            @endif
 
-    @if ($errors->any())
-        <div class="no-print mx-auto max-w-7xl px-4 pt-4">
-            <div class="rounded-xl border border-rose-500/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
-                <p class="font-semibold">Please resolve the following validation errors:</p>
-                <ul class="mt-1 list-inside list-disc space-y-0.5 text-xs">
-                    @foreach ($errors->all() as $error)
-                        <li>{{ $error }}</li>
-                    @endforeach
-                </ul>
-            </div>
+            @if (session('error'))
+                <div x-show="showError"
+                     x-transition
+                     class="flex items-start justify-between gap-4 rounded-2xl border border-rose-500/50 bg-rose-500/10 p-4 shadow-lg">
+                    <div class="flex items-start gap-3">
+                        <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-rose-500 text-sm font-extrabold text-white shadow">
+                            !
+                        </span>
+                        <div>
+                            <div class="text-xs font-extrabold uppercase tracking-wider text-rose-400">Action Blocked / Error</div>
+                            <p class="mt-0.5 text-sm font-semibold text-white">{{ session('error') }}</p>
+                        </div>
+                    </div>
+                    <button type="button" @click="showError = false" class="rounded-lg px-2 py-1 text-xs font-bold text-slate-400 hover:bg-slate-800 hover:text-white">
+                        Dismiss &times;
+                    </button>
+                </div>
+            @endif
+
+            @if ($errors->any())
+                <div x-show="showValidation"
+                     x-transition
+                     class="rounded-2xl border border-rose-500/50 bg-rose-500/10 p-4 shadow-lg">
+                    <div class="flex items-start justify-between gap-4">
+                        <div class="flex items-start gap-3">
+                            <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-rose-500 text-sm font-extrabold text-white shadow">
+                                ⚠
+                            </span>
+                            <div>
+                                <div class="text-xs font-extrabold uppercase tracking-wider text-rose-400">
+                                    Please Check Your Input ({{ $errors->count() }} {{ Str::plural('Issue', $errors->count()) }} Found)
+                                </div>
+                                <p class="mt-0.5 text-xs text-slate-300">
+                                    The action could not be completed until the following details are corrected:
+                                </p>
+                                <ul class="mt-2 list-inside list-disc space-y-1 text-xs font-semibold text-rose-200">
+                                    @foreach ($errors->all() as $error)
+                                        <li>{{ $error }}</li>
+                                    @endforeach
+                                </ul>
+                            </div>
+                        </div>
+                        <button type="button" @click="showValidation = false" class="rounded-lg px-2 py-1 text-xs font-bold text-slate-400 hover:bg-slate-800 hover:text-white">
+                            Dismiss &times;
+                        </button>
+                    </div>
+                </div>
+            @endif
         </div>
     @endif
 
     <main>
         @yield('content')
     </main>
+
+    <!-- Global Interactive Toast Notification Stack & Confirmation Modal System -->
+    <div x-data="hotelUiFeedbackHub()"
+         x-init="initHub()"
+         class="no-print">
+
+        <!-- Floating Toast Notifications (Top-Right) -->
+        <div class="pointer-events-none fixed right-4 top-16 z-50 flex w-full max-w-sm flex-col gap-2.5">
+            <template x-for="toast in toasts" :key="toast.id">
+                <div x-transition:enter="transition ease-out duration-200"
+                     x-transition:enter-start="opacity-0 translate-x-6 scale-95"
+                     x-transition:enter-end="opacity-100 translate-x-0 scale-100"
+                     x-transition:leave="transition ease-in duration-150"
+                     x-transition:leave-start="opacity-100 scale-100"
+                     x-transition:leave-end="opacity-0 scale-95"
+                     class="pointer-events-auto rounded-2xl border p-4 shadow-2xl backdrop-blur-md"
+                     :class="{
+                         'border-emerald-500/50 bg-slate-900/95': toast.type === 'success',
+                         'border-rose-500/60 bg-slate-900/95': toast.type === 'error',
+                         'border-amber-500/50 bg-slate-900/95': toast.type === 'warning',
+                         'border-sky-500/50 bg-slate-900/95': toast.type === 'info'
+                     }">
+                    <div class="flex items-start gap-3">
+                        <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-sm font-extrabold shadow"
+                              :class="{
+                                  'bg-emerald-500 text-slate-950': toast.type === 'success',
+                                  'bg-rose-500 text-white': toast.type === 'error',
+                                  'bg-amber-500 text-slate-950': toast.type === 'warning',
+                                  'bg-sky-500 text-slate-950': toast.type === 'info'
+                              }"
+                              x-text="toast.type === 'success' ? '✓' : (toast.type === 'error' ? '!' : (toast.type === 'warning' ? '⚠' : 'ℹ'))"></span>
+
+                        <div class="grow">
+                            <div class="flex items-center justify-between gap-2">
+                                <span class="text-xs font-extrabold uppercase tracking-wider"
+                                      :class="{
+                                          'text-emerald-400': toast.type === 'success',
+                                          'text-rose-400': toast.type === 'error',
+                                          'text-amber-400': toast.type === 'warning',
+                                          'text-sky-400': toast.type === 'info'
+                                      }"
+                                      x-text="toast.title"></span>
+                                <button type="button" @click="dismissToast(toast.id)" class="text-xs text-slate-400 hover:text-white">&times;</button>
+                            </div>
+                            <p class="mt-1 text-xs font-medium leading-relaxed text-white" x-text="toast.message"></p>
+                            <template x-if="toast.details && toast.details.length">
+                                <ul class="mt-1.5 list-inside list-disc space-y-0.5 text-[11px] text-slate-300">
+                                    <template x-for="(line, i) in toast.details" :key="i">
+                                        <li x-text="line"></li>
+                                    </template>
+                                </ul>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+            </template>
+        </div>
+
+        <!-- Global Safety Confirmation Modal (Prevents Accidental Clicks) -->
+        <div x-show="confirmModal.open"
+             x-cloak
+             @keydown.escape.window="cancelConfirm()"
+             class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 p-4 backdrop-blur-sm">
+            <div @click.away="cancelConfirm()"
+                 x-transition:enter="transition ease-out duration-200"
+                 x-transition:enter-start="opacity-0 scale-95 translate-y-2"
+                 x-transition:enter-end="opacity-100 scale-100 translate-y-0"
+                 class="w-full max-w-md rounded-3xl border border-slate-800 bg-slate-900 p-6 shadow-2xl">
+
+                <div class="flex items-start gap-3.5">
+                    <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-lg font-extrabold shadow-lg"
+                          :class="{
+                              'bg-emerald-500 text-slate-950': confirmModal.type === 'success',
+                              'bg-amber-500 text-slate-950': confirmModal.type === 'warning' || confirmModal.type === 'primary',
+                              'bg-rose-500 text-white': confirmModal.type === 'danger'
+                          }"
+                          x-text="confirmModal.type === 'danger' ? '!' : (confirmModal.type === 'success' ? '✓' : '?')"></span>
+
+                    <div class="grow">
+                        <span class="text-[10px] font-extrabold uppercase tracking-wider"
+                              :class="{
+                                  'text-emerald-400': confirmModal.type === 'success',
+                                  'text-amber-400': confirmModal.type === 'warning' || confirmModal.type === 'primary',
+                                  'text-rose-400': confirmModal.type === 'danger'
+                              }"
+                              x-text="confirmModal.badge || 'Action Confirmation Required'"></span>
+                        <h3 class="mt-0.5 text-base font-extrabold text-white" x-text="confirmModal.title"></h3>
+                        <p class="mt-1.5 text-xs leading-relaxed text-slate-300" x-text="confirmModal.message"></p>
+                    </div>
+                </div>
+
+                <!-- Contextual Summary Details Box -->
+                <template x-if="confirmModal.details && confirmModal.details.length > 0">
+                    <div class="mt-4 rounded-2xl border border-slate-800 bg-slate-950 p-3.5 text-xs space-y-1.5">
+                        <template x-for="(item, idx) in confirmModal.details" :key="idx">
+                            <div class="flex items-center justify-between gap-2">
+                                <span class="text-slate-400" x-text="item.label"></span>
+                                <span class="font-mono font-bold text-white" x-text="item.value"></span>
+                            </div>
+                        </template>
+                    </div>
+                </template>
+
+                <div class="mt-5 flex items-center justify-end gap-2.5 border-t border-slate-800 pt-4">
+                    <button type="button"
+                            @click="cancelConfirm()"
+                            class="rounded-xl border border-slate-700 bg-slate-800 px-4 py-2.5 text-xs font-bold text-slate-300 transition hover:bg-slate-700 hover:text-white">
+                        <span x-text="confirmModal.cancelText || 'No, Cancel'"></span>
+                    </button>
+
+                    <button type="button"
+                            @click="acceptConfirm()"
+                            class="rounded-xl px-5 py-2.5 text-xs font-extrabold shadow-lg transition"
+                            :class="{
+                                'bg-emerald-500 text-slate-950 hover:bg-emerald-400': confirmModal.type === 'success',
+                                'bg-amber-500 text-slate-950 hover:bg-amber-400': confirmModal.type === 'warning' || confirmModal.type === 'primary',
+                                'bg-rose-500 text-white hover:bg-rose-400': confirmModal.type === 'danger'
+                            }">
+                        <span x-text="confirmModal.confirmText || 'Yes, Proceed'"></span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    function hotelUiFeedbackHub() {
+        return {
+            toasts: [],
+            confirmModal: {
+                open: false,
+                type: 'primary',
+                badge: 'Please Confirm Action',
+                title: '',
+                message: '',
+                details: [],
+                confirmText: 'Yes, Proceed',
+                cancelText: 'No, Go Back',
+                onConfirm: null,
+                onCancel: null
+            },
+
+            initHub() {
+                window.hotelNotify = (options) => this.pushToast(options);
+                window.hotelConfirm = (options) => this.openConfirm(options);
+
+                // Automatically intercept forms or submit buttons with data-confirm-title
+                document.addEventListener('submit', (e) => {
+                    const form = e.target;
+                    if (!(form instanceof HTMLFormElement)) return;
+                    if (form.dataset.confirmedBypass === '1') {
+                        delete form.dataset.confirmedBypass;
+                        return;
+                    }
+
+                    const submitter = e.submitter;
+                    const title = (submitter && submitter.dataset.confirmTitle) || form.dataset.confirmTitle;
+                    if (!title) return;
+
+                    e.preventDefault();
+                    const message = (submitter && submitter.dataset.confirmMessage) || form.dataset.confirmMessage || 'Please confirm that you want to proceed with this action.';
+                    const type = (submitter && submitter.dataset.confirmType) || form.dataset.confirmType || 'primary';
+                    const confirmText = (submitter && submitter.dataset.confirmButton) || form.dataset.confirmButton || 'Yes, Confirm';
+                    const badge = (submitter && submitter.dataset.confirmBadge) || form.dataset.confirmBadge || 'Safety Confirmation';
+
+                    let details = [];
+                    const rawDetails = (submitter && submitter.dataset.confirmDetails) || form.dataset.confirmDetails;
+                    if (rawDetails) {
+                        try { details = JSON.parse(rawDetails); } catch (_) {}
+                    }
+
+                    this.openConfirm({
+                        type,
+                        badge,
+                        title,
+                        message,
+                        details,
+                        confirmText,
+                        onConfirm: () => {
+                            form.dataset.confirmedBypass = '1';
+                            if (submitter && submitter.hasAttribute('formaction')) {
+                                form.action = submitter.getAttribute('formaction');
+                            }
+                            form.submit();
+                        }
+                    });
+                });
+            },
+
+            pushToast(options) {
+                const opts = typeof options === 'string' ? { message: options } : (options || {});
+                const id = Date.now() + Math.random();
+                const type = opts.type || 'info';
+                const defaultTitles = {
+                    success: 'Action Completed',
+                    error: 'Error Occurred',
+                    warning: 'Attention Required',
+                    info: 'System Notice'
+                };
+                this.toasts.push({
+                    id,
+                    type,
+                    title: opts.title || defaultTitles[type] || 'Notice',
+                    message: opts.message || '',
+                    details: Array.isArray(opts.details) ? opts.details : []
+                });
+                const duration = opts.duration || (type === 'error' ? 7000 : 4500);
+                setTimeout(() => this.dismissToast(id), duration);
+            },
+
+            dismissToast(id) {
+                this.toasts = this.toasts.filter(t => t.id !== id);
+            },
+
+            openConfirm(options) {
+                this.confirmModal = {
+                    open: true,
+                    type: options.type || 'primary',
+                    badge: options.badge || 'Safety Confirmation Required',
+                    title: options.title || 'Confirm Action?',
+                    message: options.message || 'Are you sure you want to perform this action?',
+                    details: Array.isArray(options.details) ? options.details : [],
+                    confirmText: options.confirmText || 'Yes, Confirm',
+                    cancelText: options.cancelText || 'No, Go Back',
+                    onConfirm: typeof options.onConfirm === 'function' ? options.onConfirm : null,
+                    onCancel: typeof options.onCancel === 'function' ? options.onCancel : null
+                };
+            },
+
+            acceptConfirm() {
+                const cb = this.confirmModal.onConfirm;
+                this.confirmModal.open = false;
+                if (cb) cb();
+            },
+
+            cancelConfirm() {
+                const cb = this.confirmModal.onCancel;
+                this.confirmModal.open = false;
+                if (cb) cb();
+            }
+        };
+    }
+    </script>
 
     @stack('scripts')
 </body>

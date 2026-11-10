@@ -86,6 +86,58 @@
              } else {
                  this.cashierAddons[id].quantity--;
              }
+         },
+         confirmCashierAction(mode, formEl, actionUrl) {
+             if (Number(this.discountPct) > this.maxStandard && !this.managerPin.trim()) {
+                 window.hotelNotify({
+                     type: 'error',
+                     title: 'Manager PIN Required',
+                     message: `Discounts above ${this.maxStandard}% require a valid 4-digit Manager or Admin security PIN.`
+                 });
+                 return;
+             }
+
+             const details = [
+                 { label: 'Gross Subtotal', value: `LKR ${this.grossSubtotal.toFixed(2)}` },
+                 { label: `Discount (${this.discountPct || 0}%)`, value: `- LKR ${this.discountAmt.toFixed(2)}` },
+                 { label: `Service Charge (${this.serviceRate || 0}%)`, value: `LKR ${this.serviceAmt.toFixed(2)}` },
+                 { label: `Tax / VAT (${this.vatRate || 0}%)`, value: `LKR ${this.vatAmt.toFixed(2)}` }
+             ];
+             if (this.extraAmt > 0) {
+                 details.push({ label: this.extraChargeLabel || 'Extra Charges', value: `+ LKR ${this.extraAmt.toFixed(2)}` });
+             }
+             details.push({ label: 'Final Payable Total', value: `LKR ${this.grandTotal.toFixed(2)}` });
+
+             if (mode === 'settle') {
+                 details.push({ label: 'Payment Method', value: this.paymentMethod.toUpperCase() });
+                 window.hotelConfirm({
+                     type: 'success',
+                     badge: 'Final Invoice Settlement',
+                     title: 'Settle Invoice & Reset Table to Vacant?',
+                     message: 'This will finalize the bill, mark the table as vacant for the next guest, and dispatch the signed digital SMS receipt.',
+                     details,
+                     confirmText: '✓ Yes, Settle Invoice Now',
+                     onConfirm: () => {
+                         formEl.dataset.confirmedBypass = '1';
+                         formEl.action = actionUrl;
+                         formEl.submit();
+                     }
+                 });
+             } else {
+                 window.hotelConfirm({
+                     type: 'warning',
+                     badge: 'Recalculate Invoice Charges',
+                     title: 'Update Service Charge, Tax/VAT, Extra Charges & Discount?',
+                     message: 'This will save the updated rates and extra charges to the live invoice without closing the table yet.',
+                     details,
+                     confirmText: 'Yes, Save Bill Adjustments',
+                     onConfirm: () => {
+                         formEl.dataset.confirmedBypass = '1';
+                         formEl.action = actionUrl;
+                         formEl.submit();
+                     }
+                 });
+             }
          }
      }">
 
@@ -357,13 +409,14 @@
                             </div>
 
                             <div class="flex gap-2">
-                                <button type="submit"
-                                        formaction="{{ route('cashier.orders.discount', ['order' => $selectedOrder->id]) }}"
+                                <button type="button"
+                                        @click="confirmCashierAction('update', $el.closest('form'), @js(route('cashier.orders.discount', ['order' => $selectedOrder->id])))"
                                         class="rounded-xl border border-slate-700 bg-slate-800 px-4 py-3 text-xs font-bold text-slate-200 hover:border-amber-500">
                                     Update Bill Charges
                                 </button>
 
-                                <button type="submit"
+                                <button type="button"
+                                        @click="confirmCashierAction('settle', $el.closest('form'), @js(route('cashier.orders.settle', ['order' => $selectedOrder->id])))"
                                         class="grow rounded-xl bg-emerald-500 px-5 py-3 text-sm font-extrabold text-slate-950 shadow-lg transition hover:bg-emerald-400">
                                     ✓ Settle Invoice &amp; Dispatch SMS Receipt
                                 </button>
@@ -474,7 +527,12 @@
                     <button type="button" @click="cashierItemModal = false" class="text-xs text-slate-400 hover:text-white">Close &times;</button>
                 </div>
 
-                <form method="POST" action="{{ route('cashier.orders.append', ['order' => $selectedOrder->id]) }}" class="mt-4 space-y-4">
+                <form method="POST" action="{{ route('cashier.orders.append', ['order' => $selectedOrder->id]) }}" class="mt-4 space-y-4"
+                      data-confirm-type="primary"
+                      data-confirm-badge="Cashier Invoice Add-On"
+                      data-confirm-title="Append Selected Items to Invoice #{{ $selectedOrder->id }}?"
+                      data-confirm-message="These items will be added to the invoice, inventory will be deducted, and the bill total will be recalculated."
+                      data-confirm-button="Yes, Add to Invoice">
                     @csrf
                     <div class="max-h-72 space-y-2.5 overflow-y-auto pr-1">
                         @foreach ($categories as $category)

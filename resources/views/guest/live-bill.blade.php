@@ -159,7 +159,12 @@
                     <button type="button" @click="addonModal = false" class="text-xs text-slate-400 hover:text-white">Close &times;</button>
                 </div>
 
-                <form method="POST" action="{{ route('order.append', ['order' => $order->id]) }}" class="mt-4 space-y-4">
+                <form method="POST" action="{{ route('order.append', ['order' => $order->id]) }}" class="mt-4 space-y-4"
+                      data-confirm-type="success"
+                      data-confirm-badge="Add-On Batch Confirmation"
+                      data-confirm-title="Submit Add-On Items to Order #{{ $order->id }}?"
+                      data-confirm-message="These items will be appended as a new batch under your current table bill and sent to the kitchen/bar."
+                      data-confirm-button="✓ Yes, Order Add-On Items">
                     @csrf
                     <div class="max-h-80 space-y-3 overflow-y-auto pr-1">
                         @foreach ($categories as $category)

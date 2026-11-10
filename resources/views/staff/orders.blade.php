@@ -83,7 +83,7 @@
                     <!-- One-Tap Acknowledge & Confirm Button -->
                     <div x-show="order.needs_confirmation" class="mt-4">
                         <button type="button"
-                                @click="confirmOrder(order.id)"
+                                @click="confirmOrder(order)"
                                 class="w-full rounded-2xl bg-amber-500 py-3 text-sm font-extrabold text-slate-950 shadow-lg transition hover:bg-amber-400">
                             ✓ Acknowledge &amp; Confirm Order (Route to Kitchen &amp; Bar)
                         </button>
@@ -110,7 +110,7 @@
 
                                     <button type="button"
                                             x-show="batch.status === 'ready' || batch.status === 'confirmed'"
-                                            @click="deliverBatch(batch.id)"
+                                            @click="deliverBatch(order, batch)"
                                             class="rounded-xl bg-emerald-500 px-3 py-1 text-xs font-extrabold text-slate-950 transition hover:bg-emerald-400">
                                         Mark Batch Delivered &rarr;
                                     </button>
@@ -133,7 +133,7 @@
                                                 <span class="text-[10px] uppercase text-slate-400" x-text="item.item_status"></span>
                                                 <button type="button"
                                                         x-show="item.item_status !== 'cancelled' && item.item_status !== 'served'"
-                                                        @click="cancelItem(item.id)"
+                                                        @click="cancelItem(order, item)"
                                                         class="text-[10px] font-semibold text-rose-400 hover:underline">
                                                     Cancel
                                                 </button>
@@ -156,7 +156,7 @@
                         </button>
 
                         <button type="button"
-                                @click="sendToCashier(order.id)"
+                                @click="sendToCashier(order)"
                                 class="rounded-xl bg-emerald-500 px-4 py-2 text-xs font-extrabold text-slate-950 shadow transition hover:bg-emerald-400">
                             🧾 Confirm Completed &amp; Send to Cashier Billing
                         </button>
@@ -186,7 +186,12 @@
                 </button>
             </div>
 
-            <form method="POST" action="{{ route('staff.orders.create') }}" class="mt-4 space-y-4">
+            <form method="POST" action="{{ route('staff.orders.create') }}" class="mt-4 space-y-4"
+                  data-confirm-type="success"
+                  data-confirm-badge="Assisted Walk-In Order"
+                  data-confirm-title="Create & Confirm This Table Order?"
+                  data-confirm-message="This will immediately create a confirmed table order, deduct stock, and dispatch the items to the Kitchen and Bar stations."
+                  data-confirm-button="Yes, Create & Route Order">
                 @csrf
                 <div class="grid gap-3 sm:grid-cols-3">
                     <div>
@@ -290,7 +295,12 @@
                 <button type="button" @click="addonModalOpen = false" class="text-xs text-slate-400 hover:text-white">Close &times;</button>
             </div>
 
-            <form method="POST" :action="selectedOrder ? `/staff/orders/${selectedOrder.id}/append` : '#'" class="mt-4 space-y-4">
+            <form method="POST" :action="selectedOrder ? `/staff/orders/${selectedOrder.id}/append` : '#'" class="mt-4 space-y-4"
+                  data-confirm-type="primary"
+                  data-confirm-badge="Verbal Add-On Batch"
+                  data-confirm-title="Append These Items to the Table Bill?"
+                  data-confirm-message="The selected items will be appended as a new confirmed batch on this table's invoice and routed to the Kitchen / Bar."
+                  data-confirm-button="Yes, Append Batch">
                 @csrf
                 <div class="max-h-72 space-y-2.5 overflow-y-auto pr-1">
                     @foreach ($categories as $category)
@@ -394,64 +404,171 @@ function staffQueueApp(config) {
             } catch (e) {}
         },
 
-        confirmOrder(orderId) {
-            fetch(`/staff/orders/${orderId}/confirm`, {
-                method: 'POST',
-                headers: {
-                    'Accept': 'application/json',
-                    'X-CSRF-TOKEN': config.csrfToken,
-                    'X-Requested-With': 'XMLHttpRequest'
+        confirmOrder(order) {
+            window.hotelConfirm({
+                type: 'primary',
+                badge: 'Kitchen & Bar Dispatch',
+                title: `Confirm Order #${order.id} for Table ${order.table_number}?`,
+                message: 'Confirming this order will immediately route all pending batches to the Hot Kitchen KDS and Bar stations for preparation.',
+                details: [
+                    { label: 'Table Number', value: `Table ${order.table_number}` },
+                    { label: 'Guest Name', value: order.customer_name },
+                    { label: 'Current Bill Total', value: `LKR ${order.grand_total}` }
+                ],
+                confirmText: 'Yes, Confirm & Route to Kitchen',
+                onConfirm: () => {
+                    fetch(`/staff/orders/${order.id}/confirm`, {
+                        method: 'POST',
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': config.csrfToken,
+                            'X-Requested-With': 'XMLHttpRequest'
+                        }
+                    })
+                    .then(async res => {
+                        const data = await res.json().catch(() => ({}));
+                        if (!res.ok) throw new Error(data.message || 'Unable to confirm order.');
+                        if (data.payload) this.payload = data.payload;
+                        window.hotelNotify({
+                            type: 'success',
+                            title: `Order #${order.id} Confirmed`,
+                            message: data.message || `Table ${order.table_number} order has been routed to the Kitchen & Bar.`
+                        });
+                    })
+                    .catch(err => {
+                        window.hotelNotify({
+                            type: 'error',
+                            title: 'Confirmation Failed',
+                            message: err.message || 'Could not confirm the order. Please try again.'
+                        });
+                    });
                 }
-            })
-            .then(res => res.json())
-            .then(data => {
-                if (data.payload) this.payload = data.payload;
             });
         },
 
-        deliverBatch(batchId) {
-            fetch(`/staff/batches/${batchId}/deliver`, {
-                method: 'POST',
-                headers: {
-                    'Accept': 'application/json',
-                    'X-CSRF-TOKEN': config.csrfToken,
-                    'X-Requested-With': 'XMLHttpRequest'
+        deliverBatch(order, batch) {
+            window.hotelConfirm({
+                type: 'success',
+                badge: 'Table Delivery Verification',
+                title: `Mark Batch #${batch.batch_number} Delivered to Table ${order.table_number}?`,
+                message: 'Please confirm that all items in this batch have been physically served to the guest table.',
+                details: [
+                    { label: 'Table & Order', value: `Table ${order.table_number} (#${order.id})` },
+                    { label: 'Batch Number', value: `Batch #${batch.batch_number}` },
+                    { label: 'Items in Batch', value: `${batch.all_items ? batch.all_items.length : 0} item(s)` }
+                ],
+                confirmText: 'Yes, Mark Batch Delivered',
+                onConfirm: () => {
+                    fetch(`/staff/batches/${batch.id}/deliver`, {
+                        method: 'POST',
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': config.csrfToken,
+                            'X-Requested-With': 'XMLHttpRequest'
+                        }
+                    })
+                    .then(async res => {
+                        const data = await res.json().catch(() => ({}));
+                        if (!res.ok) throw new Error(data.message || 'Unable to mark batch delivered.');
+                        if (data.payload) this.payload = data.payload;
+                        window.hotelNotify({
+                            type: 'success',
+                            title: `Batch #${batch.batch_number} Delivered`,
+                            message: data.message || `Batch #${batch.batch_number} for Table ${order.table_number} marked as served.`
+                        });
+                    })
+                    .catch(err => {
+                        window.hotelNotify({
+                            type: 'error',
+                            title: 'Delivery Update Failed',
+                            message: err.message || 'Could not update batch status.'
+                        });
+                    });
                 }
-            })
-            .then(res => res.json())
-            .then(data => {
-                if (data.payload) this.payload = data.payload;
             });
         },
 
-        sendToCashier(orderId) {
-            fetch(`/staff/orders/${orderId}/send-to-cashier`, {
-                method: 'POST',
-                headers: {
-                    'Accept': 'application/json',
-                    'X-CSRF-TOKEN': config.csrfToken,
-                    'X-Requested-With': 'XMLHttpRequest'
+        sendToCashier(order) {
+            window.hotelConfirm({
+                type: 'success',
+                badge: 'Final Billing Handoff',
+                title: `Confirm Order #${order.id} Completed & Send to Cashier?`,
+                message: 'This will mark all remaining items for this table as served and flag the invoice as "Ready to Bill" on the Cashier Settlement Terminal.',
+                details: [
+                    { label: 'Table Number', value: `Table ${order.table_number}` },
+                    { label: 'Guest Name', value: order.customer_name },
+                    { label: 'Running Bill Total', value: `LKR ${order.grand_total}` }
+                ],
+                confirmText: '🧾 Yes, Send to Cashier Billing',
+                onConfirm: () => {
+                    fetch(`/staff/orders/${order.id}/send-to-cashier`, {
+                        method: 'POST',
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': config.csrfToken,
+                            'X-Requested-With': 'XMLHttpRequest'
+                        }
+                    })
+                    .then(async res => {
+                        const data = await res.json().catch(() => ({}));
+                        if (!res.ok) throw new Error(data.message || 'Unable to send order to cashier.');
+                        if (data.payload) this.payload = data.payload;
+                        window.hotelNotify({
+                            type: 'success',
+                            title: 'Sent to Cashier Billing',
+                            message: data.message || `Order #${order.id} (Table ${order.table_number}) is now flagged as Ready to Bill for the Cashier.`
+                        });
+                    })
+                    .catch(err => {
+                        window.hotelNotify({
+                            type: 'error',
+                            title: 'Handoff Failed',
+                            message: err.message || 'Could not send order to Cashier.'
+                        });
+                    });
                 }
-            })
-            .then(res => res.json())
-            .then(data => {
-                if (data.payload) this.payload = data.payload;
             });
         },
 
-        cancelItem(itemId) {
-            if (!confirm('Cancel this item and restore stock?')) return;
-            fetch(`/staff/items/${itemId}/cancel`, {
-                method: 'POST',
-                headers: {
-                    'Accept': 'application/json',
-                    'X-CSRF-TOKEN': config.csrfToken,
-                    'X-Requested-With': 'XMLHttpRequest'
+        cancelItem(order, item) {
+            window.hotelConfirm({
+                type: 'danger',
+                badge: 'Cancel Item & Restore Stock',
+                title: `Cancel "${item.quantity}x ${item.name}"?`,
+                message: 'This item will be removed from the active bill, inventory stock will be restored automatically, and the cancellation will be recorded in the security audit log.',
+                details: [
+                    { label: 'Table & Order', value: `Table ${order.table_number} (#${order.id})` },
+                    { label: 'Item to Cancel', value: `${item.quantity}x ${item.name}` },
+                    { label: 'Station', value: (item.station || 'kitchen').toUpperCase() }
+                ],
+                confirmText: 'Yes, Cancel Item',
+                onConfirm: () => {
+                    fetch(`/staff/items/${item.id}/cancel`, {
+                        method: 'POST',
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': config.csrfToken,
+                            'X-Requested-With': 'XMLHttpRequest'
+                        }
+                    })
+                    .then(async res => {
+                        const data = await res.json().catch(() => ({}));
+                        if (!res.ok) throw new Error(data.message || 'Unable to cancel item.');
+                        if (data.payload) this.payload = data.payload;
+                        window.hotelNotify({
+                            type: 'warning',
+                            title: 'Item Cancelled & Stock Restored',
+                            message: data.message || `${item.quantity}x ${item.name} was cancelled and the bill total was recalculated.`
+                        });
+                    })
+                    .catch(err => {
+                        window.hotelNotify({
+                            type: 'error',
+                            title: 'Cancellation Failed',
+                            message: err.message || 'Could not cancel the item.'
+                        });
+                    });
                 }
-            })
-            .then(res => res.json())
-            .then(data => {
-                if (data.payload) this.payload = data.payload;
             });
         },
 

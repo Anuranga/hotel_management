@@ -242,7 +242,12 @@
                 </button>
             </div>
 
-            <form method="POST" action="{{ route('order.place') }}" class="mt-4 space-y-5">
+            <form method="POST" action="{{ route('order.place') }}" class="mt-4 space-y-5"
+                  data-confirm-type="success"
+                  data-confirm-badge="Table {{ $table->table_number }} Order Confirmation"
+                  data-confirm-title="Place Your Order Now?"
+                  data-confirm-message="Your order will be sent directly to our service team and kitchen for preparation."
+                  data-confirm-button="✓ Yes, Place My Order">
                 @csrf
                 <input type="hidden" name="restaurant_table_id" value="{{ $table->id }}">
 
@@ -337,10 +342,19 @@ function guestMenuApp(config) {
 
         completeOnboarding() {
             if (!this.customerName || !this.isValidPhone(this.customerPhone)) {
-                alert('Please enter your name and a valid Sri Lankan mobile number (e.g., 0771234567).');
+                window.hotelNotify({
+                    type: 'warning',
+                    title: 'Guest Details Required',
+                    message: 'Please enter your name and a valid Sri Lankan mobile number (e.g., 0771234567) to continue.'
+                });
                 return;
             }
             this.onboardingModal = false;
+            window.hotelNotify({
+                type: 'success',
+                title: `Welcome, ${this.customerName}!`,
+                message: 'You can now browse the menu and add items to your table order.'
+            });
         },
 
         get cartArray() {
@@ -387,7 +401,11 @@ function guestMenuApp(config) {
         incrementItem(item) {
             const current = this.cart[item.id] ? this.cart[item.id].quantity : 0;
             if (item.maxStock !== -1 && current >= item.maxStock) {
-                alert('Maximum available stock reached for ' + item.name);
+                window.hotelNotify({
+                    type: 'warning',
+                    title: 'Stock Limit Reached',
+                    message: `Only ${item.maxStock} portion(s) of "${item.name}" are currently available.`
+                });
                 return;
             }
             if (!this.cart[item.id]) {
